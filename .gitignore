@@ -1,0 +1,9 @@
+.env
+data/
+runs/
+node_modules/
+logs/
+.DS_Store
+dist/
+sandbox/
+.versao

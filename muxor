@@ -1,0 +1,3 @@
+#!/bin/sh
+# Atalho para rodar o comando do Muxor de dentro desta pasta: ./muxor init, ./muxor diagnostico…
+exec node "$(dirname "$0")/bin/muxor.mjs" "$@"

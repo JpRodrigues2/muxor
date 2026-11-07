@@ -1,0 +1,39 @@
+{
+  "name": "muxor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "mcp:explore": "tsx scripts/mcp-explore.ts",
+    "mcp:call": "tsx scripts/mcp-call.ts",
+    "pm:login": "tsx scripts/mcp-explore.ts funifier-pm",
+    "start": "tsx src/main.ts",
+    "typecheck": "tsc --noEmit",
+    "despacho:teste": "tsx scripts/despacho-teste.ts",
+    "test": "vitest run",
+    "check": "tsc --noEmit -p . && vitest run",
+    "muxor": "node bin/muxor.mjs"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^18.0.8",
+    "grammy": "^1.46.0",
+    "node-cron": "^4.6.0",
+    "qrcode-terminal": "^0.12.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.5",
+    "@types/qrcode-terminal": "^0.12.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^3.2.7"
+  },
+  "bin": {
+    "muxor": "bin/muxor.mjs"
+  }
+}
