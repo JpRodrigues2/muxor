@@ -6,15 +6,16 @@ import { join } from 'node:path';
 import { casaDoHub } from './casa.js';
 import { rodar, variaveisDoServico, type Modo } from './diagnostico.js';
 
-const AJUDA = `Uso: ./muxor <comando>   (de dentro da pasta do Muxor)
+const AJUDA = `Uso: muxor <comando>
 
   init                            Configura o Muxor neste computador, passo a passo (retoma de onde parou)
-  init --refazer <passo>          Refaz a partir de um passo (pre, modo, ferramentas, espacos, repositorios,
-                                  existentes, depara, telegram, orca, servico, teste)
+  init --refazer <passo>          Refaz a partir de um passo (pre, modo, ferramentas, espacos, existentes,
+                                  repositorios, depara, telegram, orca, front, servico, teste)
   diagnostico [--json]            Confere a instalação e diz o próximo passo de cada problema
   adicionar github-workspace      Um espaço novo (outra conta do GitHub)
   adicionar projeto               Traz para o Muxor projetos que já estão no Orca ou nas pastas dos espaços
   adicionar heartbeat             Aviso externo se o Muxor cair (Healthchecks.io)
+  atualizar                       Baixa a versão nova do Muxor e reinicia o serviço
   desinstalar                     Desfaz tudo o que o muxor init fez neste usuário
 
 Guia completo: a pasta instalacao/ do repositório.`;
@@ -125,6 +126,24 @@ async function adicionar(o: string | undefined) {
   return 2;
 }
 
+// muxor atualizar (Mac): o código do Muxor é um clone do repositório público; puxa a versão nova, instala as
+// dependências e reinicia o serviço. No servidor, quem atualiza é o hub-atualizar.timer.
+async function atualizar() {
+  const { ROOT } = await import('../caminhos.js');
+  const { spawnSync } = await import('node:child_process');
+  if (!existsSync(join(ROOT, '.git'))) return (console.error(`${ROOT} não é um clone do git. Rode o instalador de novo: curl -fsSL https://muxor.com.br/install | bash`), 1);
+  const antes = (await rodar('git', ['-C', ROOT, 'rev-parse', '--short', 'HEAD'])).saida;
+  const passo = (bin: string, args: string[]) => spawnSync(bin, args, { cwd: ROOT, stdio: 'inherit' }).status === 0;
+  if (!passo('git', ['pull', '--ff-only', '--quiet'])) return (console.error('Não consegui baixar a versão nova (git pull). Mudou algum arquivo na pasta do Muxor?'), 1);
+  const depois = (await rodar('git', ['-C', ROOT, 'rev-parse', '--short', 'HEAD'])).saida;
+  if (antes === depois) return (console.log(`O Muxor já está na versão mais nova (${depois}).`), 0);
+  if (!passo('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund', '--loglevel=error'])) return (console.error('Falhou ao instalar as dependências (npm ci).'), 1);
+  const { ROTULO, plistDoServico } = await import('./init/servico-mac.js');
+  if (existsSync(plistDoServico())) await rodar('launchctl', ['kickstart', '-k', `gui/${userInfo().uid}/${ROTULO}`]);
+  console.log(`Muxor atualizado: ${antes} → ${depois}. O serviço foi reiniciado.`);
+  return 0;
+}
+
 const [comando, ...resto] = process.argv.slice(2);
 let codigo = 0;
 if (modo === 'servidor' && comando && comando !== 'ajuda') await prepararServidor();
@@ -145,6 +164,8 @@ if (comando === 'diagnostico') {
   prepararMac(false);
   process.env.HUB_LOG_SILENCIOSO = '1';
   codigo = await adicionar(resto[0]);
+} else if (comando === 'atualizar') {
+  codigo = modo === 'local' ? await atualizar() : (console.error('No servidor, o hub-atualizar.timer atualiza sozinho a cada 5 min.'), 2);
 } else if (comando === 'desinstalar') {
   codigo = modo === 'local' ? await (await import('./desinstalar.js')).desinstalar(casa) : (console.error('No servidor, siga instalacao/modo-servidor.md (seção "Remover").'), 2);
 } else {

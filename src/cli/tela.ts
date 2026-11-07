@@ -4,6 +4,7 @@
 import * as p from '@clack/prompts';
 import { execFile } from 'node:child_process';
 import qrcode from 'qrcode-terminal';
+import { abertura } from './arte.js';
 
 // Textos da biblioteca em português (as instruções são listas exportadas por ela).
 p.SELECT_INSTRUCTIONS.splice(0, p.SELECT_INSTRUCTIONS.length, '↑/↓ para mover', 'Enter: confirma');
@@ -24,6 +25,8 @@ function valor<T>(v: T): Exclude<T, symbol> {
 
 export const tela = {
   abertura(titulo: string) {
+    // O estagiário e o nome em caracteres, só num terminal de verdade (não em log nem no --json).
+    if (process.stdout.isTTY) process.stdout.write(abertura() + '\n');
     p.intro(` ${titulo} `);
   },
   fim(texto: string) {

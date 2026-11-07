@@ -1,4 +1,4 @@
-// `./muxor diagnostico`: confere cada peça da instalação e diz o próximo passo (O17). É a base do `./muxor init`, que
+// `muxor diagnostico`: confere cada peça da instalação e diz o próximo passo (O17). É a base do `muxor init`, que
 // usa as mesmas conferências para marcar cada passo, e o que o agente de IA do usuário lê para ajudar (`--json`).
 // Só lê: não muda nada e não renova logins (uma renovação aqui invalidaria a do Muxor rodando).
 import { execFile } from 'node:child_process';
@@ -94,7 +94,7 @@ export async function diagnosticar(d: DepsDiagnostico): Promise<Item[]> {
     add(CONF, '.env', 'ok', `válido (${d.arquivoEnv})`);
   } catch (e) {
     const msg = (e as Error).message.replace(/^\.env inválido — /, '');
-    add(CONF, '.env', 'falha', `${d.arquivoEnv}: ${msg}`, 'Rode `./muxor init` (ou corrija o .env indicado)');
+    add(CONF, '.env', 'falha', `${d.arquivoEnv}: ${msg}`, 'Rode `muxor init` (ou corrija o .env indicado)');
   }
 
   // ── Telegram
@@ -110,7 +110,7 @@ export async function diagnosticar(d: DepsDiagnostico): Promise<Item[]> {
   const FER = 'Ferramentas de gestão';
   if (env) {
     const nenhuma = !env.FUNIFIER_PM_MCP_URL && !env.BNEXO_MCP_URL && !env.JIRA_URL;
-    if (nenhuma) add(FER, 'Nenhuma', 'aviso', 'nenhuma ferramenta configurada: só atividades avulsas (/nova)', 'Rode `./muxor init` para escolher as ferramentas');
+    if (nenhuma) add(FER, 'Nenhuma', 'aviso', 'nenhuma ferramenta configurada: só atividades avulsas (/nova)', 'Rode `muxor init` para escolher as ferramentas');
     if (env.FUNIFIER_PM_MCP_URL) {
       const login = existsSync(join(d.caminhos.dados, 'oauth', 'funifier-pm.json'));
       add(FER, 'Funifier PM', login ? 'ok' : 'falha', login ? 'login salvo' : 'sem login', login ? undefined : 'Mande /pm_login no Telegram');
@@ -154,10 +154,10 @@ export async function diagnosticar(d: DepsDiagnostico): Promise<Item[]> {
   } catch (e) {
     const msg = (e as Error).message;
     if (/formato antigo/.test(msg)) add(CAT, 'apps.yaml', 'aviso', 'formato antigo (com "empresa"); o Muxor converte para espaços sozinho ao iniciar', 'Inicie o Muxor uma vez (npm start) e rode o diagnóstico de novo');
-    else add(CAT, 'apps.yaml', 'falha', msg, 'Corrija o apps.yaml indicado, ou rode `./muxor init`');
+    else add(CAT, 'apps.yaml', 'falha', msg, 'Corrija o apps.yaml indicado, ou rode `muxor init`');
   }
   if (cat) {
-    if (!cat.espacos.length) add(CAT, 'Espaços', 'falha', 'nenhum espaço', 'Rode `./muxor adicionar github-workspace`');
+    if (!cat.espacos.length) add(CAT, 'Espaços', 'falha', 'nenhum espaço', 'Rode `muxor adicionar github-workspace`');
     for (const e of cat.espacos) {
       const projetos = cat.apps.filter((a) => a.espaco === e.id).length;
       const pasta = existsSync(e.pasta);
@@ -166,7 +166,7 @@ export async function diagnosticar(d: DepsDiagnostico): Promise<Item[]> {
         `Espaço ${e.nome ?? e.id}`,
         pasta ? (e.github ? 'ok' : 'aviso') : 'falha',
         `${e.pasta} · ${projetos} projeto(s)${e.github ? ` · GitHub ${e.github}` : ' · sem conta do GitHub'}`,
-        !pasta ? `A pasta não existe: crie-a ou corrija o apps.yaml` : e.github ? undefined : 'Rode `./muxor adicionar github-workspace` para ligar a conta',
+        !pasta ? `A pasta não existe: crie-a ou corrija o apps.yaml` : e.github ? undefined : 'Rode `muxor adicionar github-workspace` para ligar a conta',
       );
     }
     const semPasta = cat.apps.filter((a) => !existsSync(a.pasta));
@@ -204,7 +204,7 @@ export async function diagnosticar(d: DepsDiagnostico): Promise<Item[]> {
     const cofre = existsSync(join(d.caminhos.dados, 'cofre.enc'));
     add(SRV, 'Cofre', cofre ? 'ok' : 'info', cofre ? 'cofre.enc existe (só o hub.service abre)' : 'vazio: as credenciais entram pelo /gamificacoes');
   } else {
-    add(SRV, 'Serviço', 'info', 'no Mac o Muxor ainda sobe com `npm start`; o `./muxor init` vai instalá-lo como serviço');
+    add(SRV, 'Serviço', 'info', 'no Mac o Muxor ainda sobe com `npm start`; o `muxor init` vai instalá-lo como serviço');
   }
   if (env) {
     add(

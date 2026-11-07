@@ -9,7 +9,10 @@ export type Alteracao =
   | { tipo: 'keychain'; servico: string }
   | { tipo: 'pasta'; caminho: string } // pasta criada pelo muxor init (espaço, projeto sem repositório)
   | { tipo: 'orca-repo'; pasta: string }
-  | { tipo: 'telegram-bot'; usuario: string };
+  | { tipo: 'telegram-bot'; usuario: string }
+  | { tipo: 'programa'; id: string; como: string } // instalado pelo Muxor (O19): o desinstalar oferece remover
+  | { tipo: 'linha-shell'; arquivo: string; linha: string } // linha do PATH no ~/.zprofile, pelo install.sh
+  | { tipo: 'atalho'; caminho: string }; // ~/.local/bin/muxor
 
 export interface Estado {
   versao: 1;

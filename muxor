@@ -1,3 +1,9 @@
 #!/bin/sh
-# Atalho para rodar o comando do Muxor de dentro desta pasta: ./muxor init, ./muxor diagnostico…
-exec node "$(dirname "$0")/bin/muxor.mjs" "$@"
+# O comando muxor: roda o Muxor desta pasta. Funciona também pelo atalho ~/.local/bin/muxor (o instalador cria),
+# por isso segue o link até a pasta de verdade.
+alvo="$0"
+while [ -L "$alvo" ]; do
+  l=$(readlink "$alvo")
+  case "$l" in /*) alvo="$l" ;; *) alvo="$(dirname "$alvo")/$l" ;; esac
+done
+exec node "$(dirname "$alvo")/bin/muxor.mjs" "$@"

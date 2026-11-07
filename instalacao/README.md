@@ -5,7 +5,7 @@ Code, peça para ele seguir esta pasta (`instalacao/`): ela responde sozinha as 
 
 ## O que é o Muxor
 
-O Muxor lê as suas tasks nas ferramentas de gestão (Funifier PM, Bnexo, Jira) e manda a lista no Telegram. Você escolhe
+O Muxor lê as suas tasks nas suas ferramentas de gestão (Jira, Funifier PM ou Bnexo) e manda a lista no Telegram. Você escolhe
 as tasks, ele escreve as instruções e abre uma sessão do Claude Code no Orca, na pasta do projeto. Quando a sessão
 termina ou precisa de você, ele avisa no Telegram. Dá para acompanhar e responder pelo celular.
 
@@ -13,12 +13,12 @@ termina ou precisa de você, ele avisa no Telegram. Dá para acompanhar e respon
 
 | Você vai precisar de | Para quê |
 |---|---|
-| Um Mac, com o Node, git, GitHub CLI, Claude Code e Orca instalados | Ver [pré-requisitos](pre-requisitos.md) |
+| Um Mac (macOS 13 ou mais novo) e a senha dele | O instalador põe o que faltar ([pré-requisitos](pre-requisitos.md)) |
 | A conta do Claude Code (assinatura) | As sessões que fazem as tasks |
-| O Telegram no celular | Onde o Muxor fala com você |
+| O celular | Telegram (onde o Muxor fala com você), Orca e Tailscale: o `muxor init` mostra um QR code com os três |
 | Acesso às suas ferramentas de gestão | Funifier PM (login normal), Bnexo (endereço e token do MCP) ou Jira (e-mail e API token) |
 | As contas do GitHub que você usa (ex.: a do trabalho e a pessoal) | Uma para cada "espaço" |
-| Uns 20 minutos | O `muxor init` guia tudo |
+| Uns 20 minutos | Um comando instala e o `muxor init` guia o resto |
 
 ## Onde o Muxor roda
 
