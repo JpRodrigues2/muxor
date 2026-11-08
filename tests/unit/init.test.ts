@@ -36,7 +36,8 @@ describe('muxor init: peças', () => {
 
   it('conta git do espaço: vale só dentro da pasta, e o desinstalar tira só a linha do Muxor', async () => {
     const global = join(raiz, 'gitconfig-global');
-    writeFileSync(global, '[user]\n\tname = Dono do Mac\n');
+    // Como no Mac do João: o global força a conta pessoal no github.com e usa o Keychain.
+    writeFileSync(global, '[user]\n\tname = Dono do Mac\n[credential]\n\thelper = osxkeychain\n[credential "https://github.com"]\n\tusername = conta-pessoal\n');
     process.env.GIT_CONFIG_GLOBAL = global;
     const pasta = join(raiz, 'EMPRESA');
     const repo = join(pasta, 'app');
@@ -47,14 +48,17 @@ describe('muxor init: peças', () => {
     execFileSync('git', ['-C', fora, 'init', '-q']);
 
     const arquivo = join(raiz, 'git', 'empresa.gitconfig');
-    const conta = { nome: 'JP Empresa', email: 'jp@empresa.com', gh: '/opt/homebrew/bin/gh', ghConfig: join(raiz, 'gh', 'empresa') };
+    const conta = { nome: 'JP Empresa', email: 'jp@empresa.com', usuario: 'conta-empresa', gh: '/opt/homebrew/bin/gh', ghConfig: join(raiz, 'gh', 'empresa') };
     const alt = await aplicarContaGit(arquivo, pasta, conta);
     await aplicarContaGit(arquivo, pasta, conta); // de novo: não duplica
     expect(alt.chave).toBe(chaveInclude(realpathSync(pasta)));
     const nome = (dir: string) => execFileSync('git', ['-C', dir, 'config', 'user.name']).toString().trim();
     expect(nome(repo)).toBe('JP Empresa');
     expect(nome(fora)).toBe('Dono do Mac');
-    expect(execFileSync('git', ['-C', repo, 'config', '--get-all', 'credential.https://github.com.helper']).toString()).toMatch(/GH_CONFIG_DIR=.*auth git-credential/);
+    // Dentro do espaço: só o gh do espaço (o Keychain fica de fora) e o usuário da conta do espaço, não o pessoal.
+    expect(execFileSync('git', ['-C', repo, 'config', '--get-urlmatch', 'credential.helper', 'https://github.com/org/repo']).toString().trim()).toMatch(/^!GH_CONFIG_DIR=.*auth git-credential$/);
+    expect(execFileSync('git', ['-C', repo, 'config', '--get-urlmatch', 'credential.username', 'https://github.com/org/repo']).toString().trim()).toBe('conta-empresa');
+    expect(execFileSync('git', ['-C', fora, 'config', '--get-urlmatch', 'credential.username', 'https://github.com/org/repo']).toString().trim()).toBe('conta-pessoal');
     expect(readFileSync(global, 'utf8').match(/includeIf/g)).toHaveLength(1);
 
     await removerContaGit(alt.chave, alt.valor);
@@ -65,7 +69,7 @@ describe('muxor init: peças', () => {
   });
 
   it('gitconfig escapa aspas no nome', () => {
-    expect(conteudoGitconfig({ nome: 'Ana "A"', email: 'a@b.c', gh: '/gh', ghConfig: '/c' })).toMatch(/name = "Ana \\"A\\""/);
+    expect(conteudoGitconfig({ nome: 'Ana "A"', email: 'a@b.c', usuario: 'ana', gh: '/gh', ghConfig: '/c' })).toMatch(/name = "Ana \\"A\\""/);
   });
 
   it('serviço do Mac: roda o código desta pasta com os dados em ~/.muxor', () => {

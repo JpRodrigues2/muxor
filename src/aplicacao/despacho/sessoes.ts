@@ -4,6 +4,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { dirSessoesClaude } from '../../caminhos.js';
+import { confiarPasta } from '../../claude-confianca.js';
 import type { App } from '../../config.js';
 import type { Selecao } from '../../dominio/selecao.js';
 import { classificarTela, type EstadoSessao } from '../../dominio/tela.js';
@@ -108,8 +109,16 @@ export class Sessoes {
     if (!/^(GH_CONFIG_DIR=\/[A-Za-z0-9/._-]+ )?(\/[A-Za-z0-9/._-]+\/)?claude( -c| --resume [A-Za-z0-9-]+)? --permission-mode [A-Za-z]+$/.test(comando))
       throw new Error(`comando inesperado: ${comando}`);
     await notificador.enviar(cartao({ icone: ICONE.sessao, titulo: `Abrindo o Claude em ${esc(app.app)}`, contexto: [`aba ${aba} no Orca`] }));
-    // No servidor, antes do Claude, marca a pasta como confiável no Claude do agente (senão ele para perguntando).
+    // Antes do Claude, a pasta como confiável (senão ele para em "Do you trust this folder?"). No servidor, pelo
+    // hub-confiar-pasta, no Claude do agente; no Mac, direto no ~/.claude.json de quem usa.
     const linha = env.HUB_CONFIAR_PASTA_CMD ? `${env.HUB_CONFIAR_PASTA_CMD} && ${comando}` : comando;
+    if (!env.HUB_CONFIAR_PASTA_CMD && process.platform === 'darwin') {
+      try {
+        if (confiarPasta(app.pasta)) log.info('despacho: pasta marcada como confiável no Claude', { pasta: app.pasta });
+      } catch (e) {
+        log.warn('despacho: não marquei a pasta como confiável', { pasta: app.pasta, error: (e as Error).message });
+      }
+    }
     // Pasta do catálogo que o Orca ainda não conhece (servidor novo, pasta criada fora do hub): adiciona antes.
     if (!(await executor.listRepos()).some((r) => r.path === app.pasta)) await executor.addRepo(app.pasta);
     const handle = await executor.createTerminal(app.pasta, linha, aba);

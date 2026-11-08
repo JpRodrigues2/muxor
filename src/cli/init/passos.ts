@@ -210,16 +210,20 @@ export async function novoEspaco(ctx: Ctx, usaFunifier: boolean) {
     [
       '1. Aperte Enter. O navegador abre no GitHub e o código já está copiado.',
       '2. Confira se o navegador está na conta deste espaço. Cole o código com Cmd+V e autorize.',
-      '3. Se o terminal perguntar "Authenticate Git with your GitHub credentials?", responda N.',
     ].join('\n'),
     `GitHub do espaço ${nome}`,
   );
   for (;;) {
     const antes = await credenciaisGlobais();
     const code = await new Promise<number>((ok) => {
-      const filho = spawn('gh', ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web', '--clipboard', '--insecure-storage'], {
+      // O login do gh não pode tocar no git nem no Keychain de quem usa o Mac. Com --git-protocol https, ele pergunta
+      // "Authenticate Git with your GitHub credentials?" (Enter = Sim) e, com o osxkeychain configurado, APAGA a
+      // credencial do github.com que estiver no Keychain (a conta pessoal) e grava a deste espaço no lugar. Por isso:
+      // ssh aqui (sem essa etapa; o https volta logo abaixo, só no gh do espaço) e um git sem configuração nenhuma
+      // durante o login (sem global, sem a do sistema, que no Mac traz o osxkeychain).
+      const filho = spawn('gh', ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'ssh', '--skip-ssh-key', '--web', '--clipboard', '--insecure-storage'], {
         stdio: ['inherit', 'inherit', 'pipe'],
-        env: ghEnv,
+        env: { ...ghEnv, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' },
       });
       // O gh mostra o código de uso único na saída de erro ("First copy your one-time code: ABCD-1234"): copio eu
       // mesmo para a área de transferência e mostro em destaque, sem depender do --clipboard do gh.
@@ -236,7 +240,10 @@ export async function novoEspaco(ctx: Ctx, usaFunifier: boolean) {
       filho.on('exit', (c) => ok(c ?? 1));
     });
     await desfazerCredenciaisNovas(antes); // se o gh mexeu no ~/.gitconfig global, volta como estava
-    if (code === 0) break;
+    if (code === 0) {
+      await rodar('/usr/bin/env', [`GH_CONFIG_DIR=${ghConfig}`, 'gh', 'config', 'set', 'git_protocol', 'https', '--host', 'github.com']);
+      break;
+    }
     tela.erro('O login do GitHub não terminou.');
     if (!(await tela.sim('Tentar de novo?'))) throw new Interrompido();
   }
@@ -254,7 +261,7 @@ export async function novoEspaco(ctx: Ctx, usaFunifier: boolean) {
     validar: (v) => (/^\S+@\S+$/.test(v) ? undefined : 'Digite o e-mail.'),
   });
   const gh = (await rodar('which', ['gh'])).saida;
-  const alt = await aplicarContaGit(gitconfigDoEspaco(ctx.casa, id), pasta, { nome: nomeGit, email: emailGit, gh, ghConfig });
+  const alt = await aplicarContaGit(gitconfigDoEspaco(ctx.casa, id), pasta, { nome: nomeGit, email: emailGit, usuario: u.login, gh, ghConfig });
   ctx.registrar({ tipo: 'gitconfig', ...alt });
   tela.ok(`Em ${pasta}, os commits saem como ${nomeGit} <${emailGit}>, pela conta ${u.login}.`);
 
@@ -578,6 +585,7 @@ export async function servico(ctx: Ctx) {
   }
   const log = join(ctx.casa.logs, 'servico.log');
   mkdirSync(ctx.casa.logs, { recursive: true });
+  const inicio = new Date().toISOString(); // só vale o "bot online" que vier depois daqui
   const caminho = [dirname(process.execPath), join(homedir(), '.local', 'bin'), '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
   const plist = await tela.esperando(
     'Instalando o Muxor como serviço do Mac',
@@ -594,7 +602,7 @@ export async function servico(ctx: Ctx) {
   );
   ctx.registrar({ tipo: 'launchagent', plist, rotulo: ROTULO });
   ctx.registrar({ tipo: 'keychain', servico: process.env.HUB_KEYCHAIN_SERVICO ?? 'hub-tasks' });
-  const subiu = await tela.esperando('Ligando o Muxor', () => esperarOnline(ctx), (ok) => (ok ? 'Muxor ligado. Chegou o aviso no Telegram' : 'O Muxor não ligou'));
+  const subiu = await tela.esperando('Ligando o Muxor', () => esperarOnline(ctx, inicio), (ok) => (ok ? 'Muxor ligado. Chegou o aviso no Telegram' : 'O Muxor não ligou'));
   if (!subiu) {
     const fim = existsSync(log) ? readFileSync(log, 'utf8').split('\n').slice(-12).join('\n') : 'Sem registro';
     tela.nota(fim, `Últimas linhas de ${log}`);
@@ -610,11 +618,16 @@ function nodeEstavel() {
   return ['/opt/homebrew/bin/node', '/usr/local/bin/node'].find(existsSync) ?? process.execPath;
 }
 
-async function esperarOnline(ctx: Ctx, limiteMs = 90_000) {
+// O "hub: bot online" desta subida: as linhas antigas do mesmo arquivo (de outra execução) não contam.
+export function subiuDesde(log: string, inicio: string) {
+  return log.split('\n').some((l) => l.includes('"hub: bot online"') && (l.match(/"ts":"([^"]+)"/)?.[1] ?? '') >= inicio);
+}
+
+async function esperarOnline(ctx: Ctx, inicio: string, limiteMs = 90_000) {
   const fim = Date.now() + limiteMs;
   while (Date.now() < fim) {
     const hoje = join(ctx.casa.logs, `hub-${new Date().toISOString().slice(0, 10)}.log`);
-    if (existsSync(hoje) && readFileSync(hoje, 'utf8').includes('"hub: bot online"')) return true;
+    if (existsSync(hoje) && subiuDesde(readFileSync(hoje, 'utf8'), inicio)) return true;
     await new Promise((r) => setTimeout(r, 2000));
   }
   return false;

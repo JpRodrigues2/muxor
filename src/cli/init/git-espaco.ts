@@ -10,6 +10,7 @@ import { rodar } from '../diagnostico.js';
 export interface ContaGit {
   nome: string;
   email: string;
+  usuario: string; // login do GitHub do espaço: vence o credential.https://github.com.username global (ex.: a conta pessoal)
   gh: string; // caminho do executável gh
   ghConfig: string; // GH_CONFIG_DIR do espaço
 }
@@ -23,6 +24,7 @@ export function conteudoGitconfig(c: ContaGit) {
     `\tname = ${aspas(c.nome)}`,
     `\temail = ${aspas(c.email)}`,
     '[credential "https://github.com"]',
+    `\tusername = ${aspas(c.usuario)}`,
     '\thelper =',
     `\thelper = ${aspas(`!GH_CONFIG_DIR='${c.ghConfig}' '${c.gh}' auth git-credential`)}`,
     '',

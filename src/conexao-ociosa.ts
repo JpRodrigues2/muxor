@@ -1,3 +1,6 @@
+import { inspect } from 'node:util';
+import { redact } from './logger.js';
+
 // Conexões HTTP que o servidor fecha por ficarem paradas (ex.: o MCP do Funifier PM enquanto você digita outra coisa).
 // No Node 26 o fetch usa HTTP/2 e, quando a sessão ociosa expira, emite um 'error' sem ninguém ouvindo: o processo
 // inteiro caía ("socket idle timeout", UND_ERR_INFO). A conexão já está morta e quem usa reconecta na próxima chamada
@@ -10,7 +13,7 @@ export function ehConexaoOciosa(e: unknown) {
 export function tolerarConexaoOciosa(registrar: (e: Error) => void) {
   process.on('uncaughtException', (e) => {
     if (ehConexaoOciosa(e)) return registrar(e);
-    console.error(e);
+    console.error(redact(inspect(e)));
     process.exit(1);
   });
 }

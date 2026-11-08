@@ -51,13 +51,22 @@ export async function instalarServico(conteudo: string) {
   mkdirSync(dirname(plist), { recursive: true });
   await pararServico();
   writeFileSync(plist, conteudo);
-  const r = await rodar('launchctl', ['bootstrap', alvo(), plist]);
+  // O bootout devolve antes de o macOS terminar de descarregar; o bootstrap logo em seguida falha com
+  // "Bootstrap failed: 5: Input/output error". Tenta algumas vezes, com uma pausa.
+  let r = { ok: false, saida: '' };
+  for (let i = 0; i < 6 && !r.ok; i++) {
+    if (i) await new Promise((ok) => setTimeout(ok, 1500));
+    r = await rodar('launchctl', ['bootstrap', alvo(), plist]);
+  }
   if (!r.ok) throw new Error(`launchctl não subiu o serviço: ${r.saida}`);
   return plist;
 }
 
 export async function pararServico() {
-  if (existsSync(plistDoServico())) await rodar('launchctl', ['bootout', `${alvo()}/${ROTULO}`]);
+  if (!existsSync(plistDoServico())) return;
+  await rodar('launchctl', ['bootout', `${alvo()}/${ROTULO}`]);
+  // Espera o serviço sair de fato (até 10 s): enquanto "launchctl print" acha o serviço, ele ainda está carregado.
+  for (let i = 0; i < 20 && (await rodar('launchctl', ['print', `${alvo()}/${ROTULO}`])).ok; i++) await new Promise((ok) => setTimeout(ok, 500));
 }
 
 export async function servicoRodando() {

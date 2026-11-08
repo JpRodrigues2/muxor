@@ -128,7 +128,16 @@ cron.schedule('*/5 * * * *', () => selecao.resumo.talvezResumoDiario('catch_up')
 cron.schedule('0 4 * * *', () => limparRuns(db), { timezone: env.TZ_HUB, noOverlap: true });
 limparRuns(db);
 
-await bot.api.setMyCommands(comandosDaLista({ funifier: temFunifier() }));
+// A lista de comandos do Telegram é enfeite: sem rede na hora de subir, tenta de novo a cada minuto, sem derrubar o Muxor.
+const registrarComandos = (): Promise<void> =>
+  bot.api.setMyCommands(comandosDaLista({ funifier: temFunifier() })).then(
+    () => {},
+    (e) => {
+      log.warn('hub: não consegui registrar os comandos do bot; tento de novo em 1 min', errInfo(e));
+      setTimeout(() => void registrarComandos(), 60_000).unref();
+    },
+  );
+void registrarComandos();
 
 async function parar(sinal: string) {
   log.info('hub: encerrando', { sinal });
