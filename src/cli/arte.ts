@@ -51,15 +51,16 @@ export function linhasArte(real: boolean): string[] {
   );
 }
 
-// Personagem à esquerda, nome e frase à direita (centralizados na altura). Terminal estreito: só o nome.
-export function abertura(o: { colunas?: number; real?: boolean; subtitulo?: string } = {}): string {
+// O nome em letras grandes e a frase embaixo. O estagiário em pixel art (linhasArte) fica guardado para quando
+// tivermos um desenho bom: comArte põe ele à esquerda do nome (só em terminal com 80 colunas ou mais).
+export function abertura(o: { colunas?: number; real?: boolean; subtitulo?: string; comArte?: boolean } = {}): string {
   const colunas = o.colunas ?? process.stdout.columns ?? 80;
   const real = o.real ?? suportaCorReal();
   const nome = NOME.map((l) => `${fg(LIMAO, real)}${l}${FIM}`);
-  const sub = `${fg(CINZA, real)}${o.subtitulo ?? 'o estagiário que despacha suas tasks para o Claude Code'}${FIM}`;
-  if (colunas < 76) return ['', ...nome, sub, ''].join('\n');
+  const sub = (o.subtitulo ?? 'o estagiário que despacha suas tasks para o Claude Code').split('\n').map((l) => `${fg(CINZA, real)}${l}${FIM}`);
+  if (!o.comArte || colunas < 80) return ['', ...nome, '', ...sub, ''].join('\n');
   const arte = linhasArte(real);
-  const direita = [...nome, '', sub];
+  const direita = [...nome, '', ...sub];
   const topo = Math.max(0, Math.floor((arte.length - direita.length) / 2));
   return ['', ...arte.map((l, i) => `${l}   ${direita[i - topo] ?? ''}`), ''].join('\n');
 }

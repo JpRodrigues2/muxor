@@ -1,4 +1,4 @@
-// Copia a abertura (o estagiário em caracteres + o nome) para dentro do instalacao/scripts/install.sh, entre as
+// Copia a abertura (o nome Muxor em letras grandes) para dentro do instalacao/scripts/install.sh, entre as
 // marcas "# >>> abertura" e "# <<< abertura". O instalador roda antes de o Muxor ser baixado, então a arte vai
 // pronta no próprio script, nas 256 cores (funcionam no Terminal do macOS). Rodar depois de mudar a arte:
 //   npx tsx scripts/arte-instalador.ts
@@ -16,13 +16,7 @@ const sub = 'instalação · o estagiário que despacha suas tasks para o Claude
 const bloco = [
   '# >>> abertura (gerado por scripts/arte-instalador.ts; não edite à mão)',
   'mostrar_abertura() {',
-  '  local colunas',
-  '  colunas="$(tput cols 2>/dev/null || echo 80)"',
-  '  if [ "$colunas" -ge 76 ]; then',
-  bash(abertura({ colunas: 120, real: false, subtitulo: sub })),
-  '  else',
-  bash(abertura({ colunas: 60, real: false, subtitulo: sub })),
-  '  fi',
+  bash(abertura({ colunas: 120, real: false, subtitulo: sub })).replace(/^    /gm, '  '),
   '}',
   '# <<< abertura',
 ].join('\n');
