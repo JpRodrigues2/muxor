@@ -706,9 +706,10 @@ export function resumoFinal(ferramentasOk: string[]) {
       'O Muxor roda neste Mac: desligado ou dormindo, as tasks param e o bot não responde.',
       'Com a tampa aberta, o Muxor já mantém o Mac acordado sozinho.',
       `Para fechar a tampa, use o ${destaque('Amphetamine')}:`,
-      '  1. No ícone da pílula na barra de menus: Start New Session › Indefinitely.',
-      '  2. Em Settings do Amphetamine, marque Launch Amphetamine at login e Start session when Amphetamine launches.',
-      '  3. Nas Settings de sessão, desmarque Allow system sleep when display is closed.',
+      // Os nomes como aparecem no Amphetamine em português (pt-BR.lproj do app).
+      '  1. No ícone da pílula na barra de menus: Começar Nova Sessão › Indefinidamente.',
+      '  2. Em Ajustes do Amphetamine, marque Abrir o Amphetamine ao iniciar a sessão e Começar sessão ao abrir o Amphetamine.',
+      '  3. Desmarque Permitir repouso do sistema com tela fechada.',
     ].join('\n'),
     'Mac acordado',
   );
