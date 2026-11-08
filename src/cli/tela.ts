@@ -52,7 +52,7 @@ export const tela = {
   // Liga a opção "← Voltar" nas listas de escolha (o muxor init liga; os outros comandos não têm passos).
   botaoVoltar: false,
   passo(n: number, total: number, titulo: string, podeVoltar = false) {
-    p.log.step(`Passo ${n} de ${total} · ${titulo}${podeVoltar ? pc.dim(`   ${pc.cyan('Esc')} volta ao passo anterior`) : ''}`);
+    p.log.step(`${destaque(`Passo ${n} de ${total}`)} · ${pc.bold(titulo)}${podeVoltar ? pc.dim(`   ${pc.cyan('Esc')} volta ao passo anterior`) : ''}`);
   },
   info: (t: string) => p.log.info(t),
   ok: (t: string) => p.log.success(t),

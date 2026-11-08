@@ -636,7 +636,7 @@ async function esperarOnline(ctx: Ctx, inicio: string, limiteMs = 90_000) {
 // ───────────────────────── 11. Teste de ponta a ponta ─────────────────────────
 
 export async function teste() {
-  tela.info('Último passo: uma task de teste numa pasta de teste. O Claude abre no Orca, responde, e o Muxor avisa no Telegram.');
+  tela.info('Último passo: uma task de teste numa pasta de teste. O Claude abre sozinho no Orca, responde, e o Muxor avisa no Telegram.');
   const { openDb } = await import('../../db.js');
   const db = openDb();
   const agora = new Date().toISOString();
@@ -644,6 +644,13 @@ export async function teste() {
   const titulo = 'Teste da instalação';
   const descricao = 'Teste da instalação do Muxor. Não altere nada na pasta: só responda com o bloco de resultado.';
   const id = db.transaction(() => {
+    // Rodando o passo de novo: as tasks de teste de antes que não terminaram saem da fila (senão a nova espera atrás
+    // delas, e a fila da sandbox anda em ordem).
+    const antigas = (db.prepare("SELECT id FROM selecoes WHERE ferramenta = 'teste' AND estado NOT IN ('finalizada', 'cancelada', 'encerrada')").all() as { id: number }[]).map((r) => r.id);
+    for (const a of antigas) {
+      db.prepare('DELETE FROM fila WHERE selecao_id = ?').run(a);
+      db.prepare("UPDATE selecoes SET estado = 'cancelada', etapa = NULL WHERE id = ?").run(a);
+    }
     db.prepare(
       `INSERT INTO tasks_vistas (ferramenta, task_id, espaco, titulo, descricao, projeto_id, projeto_nome, status, prazo, link, primeira_vez, ultima_vez)
        VALUES ('teste', ?, '', ?, ?, NULL, 'sandbox', 'teste', NULL, NULL, ?, ?)`,
@@ -656,7 +663,6 @@ export async function teste() {
     db.prepare("INSERT INTO fila (app, selecao_id, criado_em) VALUES ('sandbox', ?, ?)").run(sel, agora);
     return sel;
   })();
-  tela.info(`Na primeira vez numa pasta, o Claude pergunta se confia nela. Abra a sessão no Orca, no Mac ou no celular, e escolha ${destaque('Yes')}.`);
   const estado = await tela.esperando(
     'Rodando a task de teste, leva até 5 minutos',
     async () => {
