@@ -77,8 +77,9 @@ export async function init(casa: Casa, refazer?: string) {
           (proximo > 0 ? PASSOS[proximo - 1] : PASSOS[PASSOS.length - 1]).id,
           { semVoltar: true },
         );
-        i = PASSOS.findIndex((p) => p.id === id);
-        esquecer(i);
+        // Esquece dali para frente, mas começa do 0: o passo 1 (conferência dos programas, Amphetamine) roda sempre, e
+        // os feitos antes do escolhido são pulados. Antes, pular direto deixava a conferência para trás.
+        esquecer(PASSOS.findIndex((p) => p.id === id));
       }
     } catch (e) {
       if (e instanceof Parou) return sair();

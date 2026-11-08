@@ -95,9 +95,9 @@ export async function preRequisitos(ctx: Ctx) {
 
   // Na loja (sem login na App Store) abre uma vez só; nas próximas, só confere.
   if (!existsSync(AMPHETAMINE) && !ctx.estado.passos.amphetamineLoja) {
-    const r = await tela.esperando('Instalando o Amphetamine, que mantém o Mac acordado', () => amphetamine(), (x) => (x === 'instalado' ? 'Amphetamine instalado' : 'Abri o Amphetamine na App Store'));
+    const r = await amphetamine();
     // Como configurar fica no resumo do fim (vale também para quem já tinha o Amphetamine).
-    if (r === 'loja') tela.info('Na App Store, clique em Obter. No fim da configuração eu mostro como ligar o Amphetamine.');
+    if (r === 'loja') tela.info('Abri o Amphetamine na App Store, que mantém o Mac acordado. Clique em Obter. No fim da configuração eu mostro como ligar.');
     if (r === 'loja') ctx.estado.passos.amphetamineLoja = new Date().toISOString();
   }
   if (!ctx.estado.passos.appsCelular) {
@@ -108,24 +108,13 @@ export async function preRequisitos(ctx: Ctx) {
 }
 
 // Amphetamine (Mac App Store, grátis): mantém o Mac acordado com a tampa fechada. O serviço do Muxor já roda dentro do
-// caffeinate, que segura o Mac com a tampa aberta. Instala pelo mas (a App Store pelo terminal); sem login na App Store,
-// abre a página dele para a pessoa clicar em Obter.
+// caffeinate, que segura o Mac com a tampa aberta. App da App Store não instala pelo terminal sem senha de
+// administrador (o mas get pede root): o Muxor abre a página dele e a pessoa clica em Obter.
 const AMPHETAMINE = '/Applications/Amphetamine.app';
 const AMPHETAMINE_ID = '937984704';
 
 export async function amphetamine() {
-  if (existsSync(AMPHETAMINE)) return;
-  const brewBin = ['/opt/homebrew/bin/brew', '/usr/local/bin/brew'].find(existsSync);
-  const mas = async () => ['/opt/homebrew/bin/mas', '/usr/local/bin/mas'].find(existsSync);
-  if (!(await mas()) && brewBin) await rodar('/usr/bin/env', ['HOMEBREW_NO_AUTO_UPDATE=1', brewBin, 'install', 'mas'], 5 * 60_000);
-  const bin = await mas();
-  for (const args of [['get', AMPHETAMINE_ID], ['install', AMPHETAMINE_ID]]) {
-    if (bin && (await rodar(bin, args, 5 * 60_000)).ok && existsSync(AMPHETAMINE)) break;
-  }
-  if (existsSync(AMPHETAMINE)) {
-    await rodar('open', ['-a', 'Amphetamine']);
-    return 'instalado';
-  }
+  if (existsSync(AMPHETAMINE)) return 'instalado';
   await rodar('open', [`macappstore://apps.apple.com/app/id${AMPHETAMINE_ID}`]);
   return 'loja';
 }
