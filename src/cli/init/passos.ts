@@ -59,9 +59,11 @@ export async function escolherModo(ctx: Ctx): Promise<'local' | 'servidor'> {
 
 // ───────────────────────── 3. Ferramentas de gestão ─────────────────────────
 
-async function tentar(nome: string, fn: () => Promise<string>): Promise<boolean> {
+// As perguntas vêm antes e fora do "Conectando": o cronômetro só corre enquanto o Muxor confere.
+async function tentar(nome: string, perguntar: () => Promise<void>, fn: () => Promise<string>): Promise<boolean> {
   for (;;) {
     try {
+      await perguntar();
       await tela.esperando(`Conectando ao ${nome}`, fn, (r) => `${nome} conectado: ${r}`);
       return true;
     } catch (e) {
@@ -96,7 +98,7 @@ export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
     ctx.definirEnv({ FUNIFIER_PM_MCP_URL: 'https://pm-mcp.funifier.com/mcp' });
     tela.info('Funifier PM: o login abre no navegador. Entre, autorize o Muxor e volte aqui.');
     const { connect } = await import('../../pm/mcp-client.js');
-    const conectou = await tentar('Funifier PM', async () => {
+    const conectou = await tentar('Funifier PM', async () => {}, async () => {
       const c = await connect('funifier-pm', { interactive: true });
       await c.close();
       const pm = new FunifierPmAdapter(ctx.envParcial());
@@ -107,34 +109,38 @@ export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
   }
   if (escolhidas.includes('bnexo')) {
     tela.info('Bnexo: pegue o endereço e o token em Configurações › Integrações › MCP.');
-    const conectou = await tentar('Bnexo', async () => {
-      ctx.definirEnv({
-        BNEXO_MCP_URL: await tela.texto('Endereço do MCP do Bnexo', { validar: (v) => (/^https:\/\//.test(v) ? undefined : 'O endereço começa com https://') }),
-        BNEXO_MCP_TOKEN: await tela.segredo('Token do MCP do Bnexo'),
-      });
-      const bnexo = new BnexoAdapter(ctx.envParcial(), () => ({}));
-      return await bnexo.ping().finally(() => bnexo.fechar());
-    });
+    const conectou = await tentar(
+      'Bnexo',
+      async () =>
+        ctx.definirEnv({
+          BNEXO_MCP_URL: await tela.texto('Endereço do MCP do Bnexo', { validar: (v) => (/^https:\/\//.test(v) ? undefined : 'O endereço começa com https://') }),
+          BNEXO_MCP_TOKEN: await tela.segredo('Token do MCP do Bnexo'),
+        }),
+      async () => {
+        const bnexo = new BnexoAdapter(ctx.envParcial(), () => ({}));
+        return await bnexo.ping().finally(() => bnexo.fechar());
+      },
+    );
     if (conectou) ok.push('bnexo');
     else ctx.definirEnv({ BNEXO_MCP_URL: null, BNEXO_MCP_TOKEN: null });
   }
   if (escolhidas.includes('jira')) {
-    tela.nota(
-      [
-        '1. Abra o seu Jira no navegador e copie o endereço da barra.',
-        '2. Na página que abri, clique em Create API token, dê o nome Muxor e copie o token.',
-      ].join('\n'),
+    tela.info('Jira: o Muxor entra com o seu e-mail e um API token, uma senha só para ele que você apaga quando quiser.');
+    const conectou = await tentar(
       'Jira',
+      async () => {
+        const site = await tela.texto('Endereço do seu Jira, ex.: minhaempresa.atlassian.net', {
+          padrao: ctx.envParcial().JIRA_URL?.replace(/^https:\/\//, ''),
+          validar: (v) => (enderecoJira(v) ? undefined : 'Só o endereço do site, ex.: minhaempresa.atlassian.net'),
+        });
+        const email = await tela.texto('E-mail da sua conta Atlassian', { padrao: ctx.envParcial().JIRA_EMAIL, validar: (v) => (/^\S+@\S+\.\S+$/.test(v) ? undefined : 'Digite o e-mail.') });
+        tela.info('Abri a página do token. Clique em Create API token, dê o nome Muxor, copie e cole abaixo.');
+        await rodar('open', ['https://id.atlassian.com/manage-profile/security/api-tokens']);
+        const token = await tela.segredo('API token do Jira');
+        ctx.definirEnv({ JIRA_URL: enderecoJira(site), JIRA_EMAIL: email, JIRA_API_TOKEN: token });
+      },
+      async () => new JiraAdapter(ctx.envParcial()).ping(),
     );
-    await rodar('open', ['https://id.atlassian.com/manage-profile/security/api-tokens']);
-    const conectou = await tentar('Jira', async () => {
-      ctx.definirEnv({
-        JIRA_URL: enderecoJira(await tela.texto('Endereço do seu Jira. Cole o que está na barra do navegador', { validar: (v) => (enderecoJira(v) ? undefined : 'Cole o endereço do Jira, ex.: minhaempresa.atlassian.net') })),
-        JIRA_EMAIL: await tela.texto('E-mail da conta Atlassian', { validar: (v) => (/^\S+@\S+$/.test(v) ? undefined : 'Digite o e-mail.') }),
-        JIRA_API_TOKEN: await tela.segredo('API token do Jira'),
-      });
-      return await new JiraAdapter(ctx.envParcial()).ping();
-    });
     if (conectou) ok.push('jira');
     else ctx.definirEnv({ JIRA_URL: null, JIRA_EMAIL: null, JIRA_API_TOKEN: null });
   }
@@ -144,7 +150,7 @@ export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
 // O endereço do Jira completo a partir do que a pessoa digitar: "minhaempresa", "minhaempresa.atlassian.net" ou a URL.
 export function enderecoJira(v: string) {
   const t = v.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
-  if (!t || !/^[a-z0-9.-]+$/.test(t)) return '';
+  if (!t || !/^[a-z0-9.-]+$/.test(t) || t.split('.').some((r) => !r || r.length > 63)) return '';
   return `https://${t.includes('.') ? t : `${t}.atlassian.net`}`;
 }
 

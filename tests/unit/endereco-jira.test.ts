@@ -13,3 +13,9 @@ describe('endereço do Jira', () => {
     expect(enderecoJira('minha empresa')).toBe('');
   });
 });
+
+describe('token colado no lugar do endereço', () => {
+  it('é recusado', () => {
+    expect(enderecoJira('ATATT3xFfGF08n4e3JZsCDOZsWDVz9-nqI7nTVUWyYN3wreCWtlNTMFvyLeoPhWwlsAJY2PTuWZSjecNvuUS0cSBWGXFLM0E5vBkSKL5')).toBe('');
+  });
+});
