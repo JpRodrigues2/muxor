@@ -25,8 +25,9 @@ function valor<T>(v: T): Exclude<T, symbol> {
 
 export const tela = {
   abertura(titulo: string) {
-    // O estagiário e o nome em caracteres, só num terminal de verdade (não em log nem no --json).
-    if (process.stdout.isTTY) process.stdout.write(abertura() + '\n');
+    // O estagiário e o nome em caracteres, só num terminal de verdade (não em log nem no --json). Vindo do
+    // instalador do site, o desenho já apareceu no começo (MUXOR_SEM_ABERTURA): não repete.
+    if (process.stdout.isTTY && !process.env.MUXOR_SEM_ABERTURA) process.stdout.write(abertura() + '\n');
     p.intro(` ${titulo} `);
   },
   fim(texto: string) {
