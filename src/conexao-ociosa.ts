@@ -1,5 +1,7 @@
 import { inspect } from 'node:util';
-import { redact } from './logger.js';
+// redigir.js, não logger.js: o logger calcula as pastas ao ser carregado, e este arquivo carrega no começo do
+// comando muxor, antes de ele apontar para ~/.muxor/dados (o init chegou a ler um catálogo vazio por isso).
+import { redact } from './redigir.js';
 
 // Conexões HTTP que o servidor fecha por ficarem paradas (ex.: o MCP do Funifier PM enquanto você digita outra coisa).
 // No Node 26 o fetch usa HTTP/2 e, quando a sessão ociosa expira, emite um 'error' sem ninguém ouvindo: o processo
