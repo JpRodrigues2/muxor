@@ -3,9 +3,12 @@
 // Links aparecem como texto, com QR code (para o celular) e, no Mac, abrem no navegador quando a pessoa quer.
 import * as p from '@clack/prompts';
 import { execFile } from 'node:child_process';
-import pc from 'picocolors';
 import qrcode from 'qrcode-terminal';
 import { abertura } from './arte.js';
+
+// Cores do terminal sem biblioteca (os códigos ANSI de sempre).
+const ansi = (abre: number, fecha: number) => (t: string) => `\x1b[${abre}m${t}\x1b[${fecha}m`;
+const pc = { bold: ansi(1, 22), dim: ansi(2, 22), yellow: ansi(33, 39), green: ansi(32, 39), cyan: ansi(36, 39) };
 
 // Textos da biblioteca em português (as instruções são listas exportadas por ela). As teclas que importam vêm em
 // destaque: Espaço marca (amarelo), Enter confirma (verde), Esc volta (ciano).
