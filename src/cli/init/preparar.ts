@@ -96,14 +96,8 @@ export async function preRequisitos(ctx: Ctx) {
   // Na loja (sem login na App Store) abre uma vez só; nas próximas, só confere.
   if (!existsSync(AMPHETAMINE) && !ctx.estado.passos.amphetamineLoja) {
     const r = await tela.esperando('Instalando o Amphetamine, que mantém o Mac acordado', () => amphetamine(), (x) => (x === 'instalado' ? 'Amphetamine instalado' : 'Abri o Amphetamine na App Store'));
-    tela.nota(
-      [
-        ...(r === 'loja' ? ['Na App Store, clique em Obter e depois em Abrir.'] : []),
-        'No ícone da pílula na barra de menus: Start New Session › Indefinitely.',
-        'Em Settings do Amphetamine, marque Launch Amphetamine at login e Start session when Amphetamine launches.',
-      ].join('\n'),
-      'Amphetamine',
-    );
+    // Como configurar fica no resumo do fim (vale também para quem já tinha o Amphetamine).
+    if (r === 'loja') tela.info('Na App Store, clique em Obter. No fim da configuração eu mostro como ligar o Amphetamine.');
     if (r === 'loja') ctx.estado.passos.amphetamineLoja = new Date().toISOString();
   }
   if (!ctx.estado.passos.appsCelular) {

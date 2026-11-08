@@ -700,4 +700,16 @@ export function resumoFinal(ferramentasOk: string[]) {
     '  muxor desinstalar                  desfaz a instalação',
   ];
   tela.nota(linhas.join('\n'), 'Pronto');
+  // Modo local: o Muxor só trabalha com o Mac ligado e acordado. Vale para quem já tinha o Amphetamine também.
+  tela.nota(
+    [
+      'O Muxor roda neste Mac: desligado ou dormindo, as tasks param e o bot não responde.',
+      'Com a tampa aberta, o Muxor já mantém o Mac acordado sozinho.',
+      `Para fechar a tampa, use o ${destaque('Amphetamine')}:`,
+      '  1. No ícone da pílula na barra de menus: Start New Session › Indefinitely.',
+      '  2. Em Settings do Amphetamine, marque Launch Amphetamine at login e Start session when Amphetamine launches.',
+      '  3. Nas Settings de sessão, desmarque Allow system sleep when display is closed.',
+    ].join('\n'),
+    'Mac acordado',
+  );
 }
