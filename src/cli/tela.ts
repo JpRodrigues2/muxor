@@ -3,12 +3,15 @@
 // Links aparecem como texto, com QR code (para o celular) e, no Mac, abrem no navegador quando a pessoa quer.
 import * as p from '@clack/prompts';
 import { execFile } from 'node:child_process';
+import pc from 'picocolors';
 import qrcode from 'qrcode-terminal';
 import { abertura } from './arte.js';
 
-// Textos da biblioteca em português (as instruções são listas exportadas por ela).
-p.SELECT_INSTRUCTIONS.splice(0, p.SELECT_INSTRUCTIONS.length, '↑/↓ para mover', 'Enter: confirma', 'Esc: voltar');
-p.MULTISELECT_INSTRUCTIONS.splice(0, p.MULTISELECT_INSTRUCTIONS.length, '↑/↓ para mover', 'Espaço: marca', 'Enter: confirma', 'Esc: voltar');
+// Textos da biblioteca em português (as instruções são listas exportadas por ela). As teclas que importam vêm em
+// destaque: Espaço marca (amarelo), Enter confirma (verde), Esc volta (ciano).
+const tecla = { espaco: pc.bold(pc.yellow('Espaço: marca')), enter: pc.bold(pc.green('Enter: confirma')), esc: pc.bold(pc.cyan('Esc: voltar')) };
+p.SELECT_INSTRUCTIONS.splice(0, p.SELECT_INSTRUCTIONS.length, '↑/↓ para mover', tecla.enter, tecla.esc);
+p.MULTISELECT_INSTRUCTIONS.splice(0, p.MULTISELECT_INSTRUCTIONS.length, '↑/↓ para mover', tecla.espaco, tecla.enter, tecla.esc);
 p.updateSettings({ messages: { cancel: 'Cancelado', error: 'Algo deu errado' } });
 
 // Ctrl+C ou Esc em qualquer pergunta: para sem estragar nada; o progresso fica salvo.
@@ -17,6 +20,14 @@ export class Parou extends Error {
     super('parou');
   }
 }
+
+// A opção "← Voltar" das listas de escolha (no muxor init): volta direto ao passo anterior.
+export class Voltar extends Error {
+  constructor() {
+    super('voltar');
+  }
+}
+const VOLTAR = '__voltar__';
 
 function valor<T>(v: T): Exclude<T, symbol> {
   if (p.isCancel(v)) throw new Parou();
@@ -33,8 +44,10 @@ export const tela = {
   fim(texto: string) {
     p.outro(texto);
   },
-  passo(n: number, total: number, titulo: string) {
-    p.log.step(`Passo ${n} de ${total} · ${titulo}`);
+  // Liga a opção "← Voltar" nas listas de escolha (o muxor init liga; os outros comandos não têm passos).
+  botaoVoltar: false,
+  passo(n: number, total: number, titulo: string, podeVoltar = false) {
+    p.log.step(`Passo ${n} de ${total} · ${titulo}${podeVoltar ? `  ${pc.dim('(')}${pc.cyan('Esc')}${pc.dim(' ou ← Voltar: passo anterior)')}` : ''}`);
   },
   info: (t: string) => p.log.info(t),
   ok: (t: string) => p.log.success(t),
@@ -59,8 +72,12 @@ export const tela = {
   async sim(pergunta: string, padrao = true) {
     return valor(await p.confirm({ message: pergunta, initialValue: padrao }));
   },
-  async escolher<T extends string>(pergunta: string, opcoes: { valor: T; rotulo: string; dica?: string }[], padrao?: T) {
-    return valor(await p.select({ message: pergunta, options: opcoes.map((o) => ({ value: o.valor, label: o.rotulo, hint: o.dica })) as never, initialValue: padrao })) as T;
+  async escolher<T extends string>(pergunta: string, opcoes: { valor: T; rotulo: string; dica?: string }[], padrao?: T, o: { semVoltar?: boolean } = {}) {
+    const comVoltar = tela.botaoVoltar && !o.semVoltar;
+    const lista = [...opcoes.map((x) => ({ value: x.valor as string, label: x.rotulo, hint: x.dica })), ...(comVoltar ? [{ value: VOLTAR, label: pc.cyan('← Voltar ao passo anterior') }] : [])];
+    const r = valor(await p.select({ message: pergunta, options: lista as never, initialValue: padrao }));
+    if (r === VOLTAR) throw new Voltar();
+    return r as T;
   },
   async varios<T extends string>(pergunta: string, opcoes: { valor: T; rotulo: string; dica?: string }[], obrigatorio = false) {
     return valor(

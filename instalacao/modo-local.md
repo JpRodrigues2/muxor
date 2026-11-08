@@ -69,5 +69,5 @@ De qualquer pasta (quem baixou com `git clone` usa `./muxor`, de dentro da pasta
 | `muxor adicionar github-workspace` | Mais um espaço (outra conta do GitHub) |
 | `muxor adicionar projeto` | Traz para o Muxor projetos que já estão no Orca ou nas pastas dos espaços, e liga aos projetos das ferramentas |
 | `muxor adicionar heartbeat` | Aviso se o Muxor cair ([heartbeat](heartbeat.md)) |
-| `muxor atualizar` | Baixa a versão nova do Muxor e reinicia o serviço |
+| `muxor update` | Baixa a versão nova do Muxor e reinicia o serviço |
 | `muxor desinstalar` | Tira o Muxor do Mac ([desinstalar](desinstalar.md)) |

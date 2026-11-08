@@ -18,7 +18,7 @@ const AJUDA = `Uso: muxor <comando>
   adicionar github-workspace      Um espaço novo (outra conta do GitHub)
   adicionar projeto               Traz para o Muxor projetos que já estão no Orca ou nas pastas dos espaços
   adicionar heartbeat             Aviso externo se o Muxor cair (Healthchecks.io)
-  atualizar                       Baixa a versão nova do Muxor e reinicia o serviço
+  update                          Baixa a versão nova do Muxor e reinicia o serviço
   desinstalar                     Desfaz tudo o que o muxor init fez neste usuário
 
 Guia completo: a pasta instalacao/ do repositório.`;
@@ -129,7 +129,7 @@ async function adicionar(o: string | undefined) {
   return 2;
 }
 
-// muxor atualizar (Mac): o código do Muxor é um clone do repositório público; puxa a versão nova, instala as
+// muxor update (Mac): o código do Muxor é um clone do repositório público; puxa a versão nova, instala as
 // dependências e reinicia o serviço. No servidor, quem atualiza é o hub-atualizar.timer.
 async function atualizar() {
   const { ROOT } = await import('../caminhos.js');
@@ -167,7 +167,7 @@ if (comando === 'diagnostico') {
   prepararMac(false);
   process.env.HUB_LOG_SILENCIOSO = '1';
   codigo = await adicionar(resto[0]);
-} else if (comando === 'atualizar') {
+} else if (comando === 'update' || comando === 'atualizar') { // atualizar: o nome antigo, para quem já aprendeu
   codigo = modo === 'local' ? await atualizar() : (console.error('No servidor, o hub-atualizar.timer atualiza sozinho a cada 5 min.'), 2);
 } else if (comando === 'desinstalar') {
   codigo = modo === 'local' ? await (await import('./desinstalar.js')).desinstalar(casa) : (console.error('No servidor, siga instalacao/modo-servidor.md (seção "Remover").'), 2);

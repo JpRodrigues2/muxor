@@ -163,6 +163,12 @@ export async function espacos(ctx: Ctx) {
   );
   await esperar('gh');
   const usaFunifier = !!process.env.FUNIFIER_PM_MCP_URL;
+  // Retomando (ou voltando a este passo): os espaços já criados ficam, e eu só pergunto se quer outro.
+  const jaTem = loadCatalogo().espacos;
+  if (jaTem.length) {
+    tela.ok(`Espaços que você já criou:\n${jaTem.map((e) => `  • ${nomeEspaco(e)} → ${e.pasta}${e.github ? ` (conta ${e.github})` : ''}`).join('\n')}`);
+    if (!(await tela.sim('Criar mais um espaço (outra conta do GitHub)?', false))) return;
+  }
   do await novoEspaco(ctx, usaFunifier);
   while (await tela.sim('Adicionar outro espaço (outra conta do GitHub)?', false));
 }
@@ -192,7 +198,7 @@ export async function novoEspaco(ctx: Ctx, usaFunifier: boolean) {
   tela.nota(
     [
       `Login do GitHub do espaço "${nome}":`,
-      '1. Vai aparecer um código de 8 letras (já copiado). Aperte Enter e o navegador abre no GitHub.',
+      '1. Vai aparecer um código de 8 letras: eu já copio para você. Aperte Enter e o navegador abre no GitHub.',
       '2. Cole o código e autorize. Se o navegador estiver logado em OUTRA conta, troque de conta lá antes.',
       '3. Se perguntar "Authenticate Git with your GitHub credentials?", responda N: o Muxor já faz isso só para esta pasta.',
     ].join('\n'),
@@ -200,11 +206,25 @@ export async function novoEspaco(ctx: Ctx, usaFunifier: boolean) {
   );
   for (;;) {
     const antes = await credenciaisGlobais();
-    const code = await new Promise<number>((ok) =>
-      spawn('gh', ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web', '--clipboard', '--insecure-storage'], { stdio: 'inherit', env: ghEnv }).on('exit', (c) =>
-        ok(c ?? 1),
-      ),
-    );
+    const code = await new Promise<number>((ok) => {
+      const filho = spawn('gh', ['auth', 'login', '--hostname', 'github.com', '--git-protocol', 'https', '--web', '--clipboard', '--insecure-storage'], {
+        stdio: ['inherit', 'inherit', 'pipe'],
+        env: ghEnv,
+      });
+      // O gh mostra o código de uso único na saída de erro ("First copy your one-time code: ABCD-1234"): copio eu
+      // mesmo para a área de transferência e mostro em destaque, sem depender do --clipboard do gh.
+      let copiado = false;
+      filho.stderr.on('data', (d: Buffer) => {
+        process.stderr.write(d);
+        const m = !copiado && d.toString().match(/one-time code:\s*([A-Z0-9]{4}-[A-Z0-9]{4})/);
+        if (m) {
+          copiado = true;
+          void rodar('sh', ['-c', 'printf %s "$1" | pbcopy', 'sh', m[1]]);
+          process.stderr.write(`\n  ✔ Código ${m[1]} copiado: no GitHub, é só colar (Cmd+V).\n\n`);
+        }
+      });
+      filho.on('exit', (c) => ok(c ?? 1));
+    });
     await desfazerCredenciaisNovas(antes); // se o gh mexeu no ~/.gitconfig global, volta como estava
     if (code === 0) break;
     tela.erro('O login do GitHub não terminou.');
@@ -218,9 +238,11 @@ export async function novoEspaco(ctx: Ctx, usaFunifier: boolean) {
   });
   tela.ok(`GitHub: conta ${u.login}.`);
   const nomeGit = await tela.texto('Nome que vai nos commits deste espaço', { padrao: u.name ?? u.login });
-  const emailGit = await tela.texto('E-mail dos commits deste espaço', {
-    padrao: u.email ?? `${u.id}+${u.login}@users.noreply.github.com`,
-    validar: (v) => (/^\S+@\S+$/.test(v) ? undefined : 'E-mail inválido.'),
+  const sugestao = u.email ?? `${u.id}+${u.login}@users.noreply.github.com`;
+  tela.info(`E-mail dos commits: use o da conta ${u.login}. Sugestão: ${sugestao}${u.email ? '' : ' (o e-mail privado que o GitHub dá a cada conta)'}`);
+  const emailGit = await tela.texto('E-mail dos commits deste espaço (digite ou cole)', {
+    exemplo: sugestao,
+    validar: (v) => (/^\S+@\S+$/.test(v) ? undefined : 'Digite o e-mail (ex.: o sugerido acima).'),
   });
   const gh = (await rodar('which', ['gh'])).saida;
   const alt = await aplicarContaGit(gitconfigDoEspaco(ctx.casa, id), pasta, { nome: nomeGit, email: emailGit, gh, ghConfig });
@@ -277,11 +299,14 @@ export async function existentes(ctx: Ctx) {
   const { Orca } = await import('../../adaptadores/executor/orca.js');
   const cat = loadCatalogo();
   const noHub = new Set(cat.apps.map((a) => a.pasta));
-  const repos = (await new Orca(ORCA_BIN).listRepos().catch(() => [])).filter((r) => !noHub.has(r.path) && r.path !== ctx.casa.sandbox);
-  if (!repos.length) return tela.info('Nenhum projeto no Orca fora do hub.');
+  const doOrca = (await new Orca(ORCA_BIN).listRepos().catch(() => [])).filter((r) => r.path !== ctx.casa.sandbox);
+  const jaNoMuxor = cat.apps.filter((a) => doOrca.some((r) => r.path === a.pasta));
+  if (jaNoMuxor.length) tela.ok(`Já no Muxor (${jaNoMuxor.length}):\n${jaNoMuxor.map((a) => `  • ${a.app} → ${a.pasta}`).join('\n')}`);
+  const repos = doOrca.filter((r) => !noHub.has(r.path));
+  if (!repos.length) return tela.info(jaNoMuxor.length ? 'Todos os seus projetos do Orca já estão no Muxor.' : 'Nenhum projeto no Orca para trazer.');
   tela.nota(
     [
-      `Você já tem ${repos.length} projeto(s) no Orca. Para cada um, você decide:`,
+      `Você tem ${repos.length} projeto(s) no Orca que ainda não estão no Muxor. Para cada um, você decide:`,
       '  • Trazer para o Muxor: ele entra no fluxo completo. O Muxor manda tasks para ele, abre sessões do Claude e',
       '    escreve nas sessões que já existem nessa pasta, e marca o status da área de trabalho no Orca.',
       '  • Deixar de fora: o Muxor nunca toca nesse projeto nem nas sessões dele.',
@@ -316,8 +341,31 @@ export async function existentes(ctx: Ctx) {
 // ───────────────────────── 6. Repositórios (pelo Claude Code do usuário) ─────────────────────────
 
 export async function repositorios(ctx: Ctx) {
-  await claudeComLogin();
   const cat = loadCatalogo();
+  // Primeiro o que já está pronto: os projetos que já estão no Muxor e as pastas que existem em cada espaço.
+  const noMuxor = new Set(cat.apps.map((a) => a.pasta));
+  const resumo = cat.espacos.map((e) => {
+    const pastas = subpastas(e.pasta);
+    const dentro = pastas.filter((n) => noMuxor.has(join(e.pasta, n)));
+    return `  • ${nomeEspaco(e)} (${e.pasta}): ${pastas.length} pasta(s)${dentro.length ? `, ${dentro.length} já no Muxor` : ''}${pastas.length ? `\n      ${pastas.slice(0, 8).join(', ')}${pastas.length > 8 ? '…' : ''}` : ''}`;
+  });
+  tela.nota(
+    [
+      'Este passo é só para BAIXAR repositórios que ainda não estão no seu Mac (git clone).',
+      'Os projetos que você já tem (os que trouxe do Orca no passo anterior e as pastas dentro dos espaços) não precisam',
+      'de nada aqui: no próximo passo você liga cada projeto da ferramenta de gestão a uma dessas pastas.',
+      '',
+      'O que já está nos seus espaços:',
+      ...(resumo.length ? resumo : ['  (nenhum espaço)']),
+    ].join('\n'),
+    'Repositórios',
+  );
+  const quer = await tela.escolher('Falta baixar algum repositório?', [
+    { valor: 'nao', rotulo: 'Não, já tenho os projetos de que preciso', dica: 'segue para o próximo passo' },
+    { valor: 'sim', rotulo: 'Sim, quero clonar repositórios agora', dica: 'o seu Claude Code clona nas pastas certas' },
+  ]);
+  if (quer === 'nao') return;
+  await claudeComLogin();
   const lista = cat.espacos
     .map((e) => `- ${nomeEspaco(e)}: pasta ${e.pasta}${e.github ? `, conta do GitHub ${e.github}` : ''}${e.gh_config ? `, login do espaço GH_CONFIG_DIR=${e.gh_config}` : ''}`)
     .join('\n');
@@ -328,16 +376,16 @@ export async function repositorios(ctx: Ctx) {
   await rodar('sh', ['-c', `printf %s "$1" | pbcopy`, 'sh', prompt]);
   tela.nota(
     [
-      'Agora traga os repositórios que você quer trabalhar com o Muxor. Quem clona é o seu Claude Code:',
+      'Quem clona é o seu Claude Code, cada repositório na pasta do espaço da conta dele:',
       '1. Abra uma janela nova do Terminal (Cmd+N) e rode: claude',
       '2. Cole (Cmd+V): o pedido já está copiado. Diga quais repositórios de cada conta você quer.',
       '3. Quando ele terminar, volte para esta janela.',
       '',
       'Projeto sem repositório (ex.: uma pasta só para instalar um MCP) também vale: crio a pasta no próximo passo.',
     ].join('\n'),
-    'Repositórios',
+    'Clonar com o Claude Code',
   );
-  await tela.enter('Quando os repositórios estiverem nas pastas (ou se quiser pular), aperte Enter');
+  await tela.enter('Quando o Claude terminar de clonar, aperte Enter');
   const total = cat.espacos.reduce((n, e) => n + subpastas(e.pasta).length, 0);
   tela.ok(`${total} pasta(s) de projeto nos espaços.`);
 }
