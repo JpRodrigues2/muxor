@@ -7,7 +7,7 @@ export const ACOES_POR_ETAPA = {
   info: ['pular', 'cancel'],
   destino: ['ok', 'outro', 'cancel'],
   escolher_app: ['app', 'cancel'],
-  escolher_orca: ['orca', 'cancel'],
+  escolher_pasta: ['pasta', 'cancel'],
   alvo: ['g', 'gok', 'gnova', 'gsem', 'cancel'],
   ambiente: ['amb', 'cancel'],
   amb_espaco: ['aesp', 'cancel'],
@@ -39,7 +39,7 @@ export interface Selecao {
   anexos: string | null; // JSON: arquivos mandados pelo Telegram
   aviso_em: string | null;
   aviso_motivo: string | null;
-  ambiente: string | null; // JSON { espaco, nome } enquanto monta um ambiente novo; { orca: [pastas] } ao escolher do Orca
+  ambiente: string | null; // JSON { espaco, nome } enquanto monta um ambiente novo; { pastas: [...] } ao escolher um projeto do computador
   lote_de: number | null; // id da líder do lote
 }
 

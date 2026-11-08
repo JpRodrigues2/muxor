@@ -85,8 +85,9 @@ export class Ambientes {
     return true;
   }
 
-  // Projeto que já está no Orca (fora do Muxor): entra no Muxor ligado ao projeto da task.
-  async trazerDoOrca(s: Selecao, pasta: string): Promise<boolean> {
+  // Projeto do computador que ainda não está no Muxor (do Orca ou de dentro de um espaço): entra no Muxor ligado ao
+  // projeto da task. A pasta fica onde está; o Orca recebe a pasta na hora de abrir a sessão, se ainda não tiver.
+  async trazerPasta(s: Selecao, pasta: string): Promise<boolean> {
     const { catalogo, selecoes, notificador } = this.d;
     const cat = catalogo.atual();
     const t = this.conversa.task(s);
@@ -100,7 +101,7 @@ export class Ambientes {
     try {
       catalogo.adicionarApp({ app: nome, espaco: espaco.id, ferramenta: s.ferramenta as App['ferramenta'], pasta, projeto: t.projeto_id });
     } catch (e) {
-      log.warn('ambiente: falha ao trazer do Orca', { selecao: s.id, pasta, ...errInfo(e) });
+      log.warn('ambiente: falha ao trazer a pasta', { selecao: s.id, pasta, ...errInfo(e) });
       await notificador.enviar(cartao({ icone: ICONE.falha, titulo: `Não consegui trazer ${esc(basename(pasta))}`, contexto: [esc((e as Error).message)] }));
       return false;
     }

@@ -218,7 +218,7 @@ describe('ambiente novo (B15)', () => {
     await resumo.finalizar(r, 'go');
     const s = ultimaSelecao();
     await configurar.onAcao(s, 'pular', undefined);
-    expect(chat.ultima().html).toMatch(/Em qual pasta este projeto roda\?/);
+    expect(chat.ultima().html).toMatch(/Ligar este projeto ao Muxor/);
     await configurar.onAcao(s, 'amb', 'novo');
     expect(chat.ultima().html).toMatch(/Em qual espaço criar a pasta\?/);
     await configurar.onAcao(s, 'aesp', 'funifier');
@@ -238,7 +238,7 @@ describe('ambiente novo (B15)', () => {
     expect(chat.ultima().html).toMatch(/novo-app não tem gamificação vinculada/);
   });
 
-  it('projeto sem app: liga a um projeto que já está no Orca, fora do Muxor', async () => {
+  it('projeto sem app: liga a um projeto do computador que ainda não está no Muxor (do Orca ou de um espaço)', async () => {
     await configurar.onAcao(ultimaSelecao(), 'cancel', undefined); // a do teste anterior ainda espera a gamificação
     const doOrca = join(raiz, 'repos', 'FUNIFIER', 'do-orca');
     repos.push(doOrca);
@@ -249,12 +249,12 @@ describe('ambiente novo (B15)', () => {
     await resumo.finalizar(r, 'go');
     const s = ultimaSelecao();
     await configurar.onAcao(s, 'pular', undefined);
-    await configurar.onAcao(s, 'amb', 'orca');
-    expect(chat.ultima().html).toMatch(/Qual projeto do Orca\?/);
-    const i = chat.textos().indexOf(doOrca);
+    await configurar.onAcao(s, 'amb', 'computador');
+    expect(chat.ultima().html).toMatch(/Qual projeto\?/);
+    const i = chat.textos().indexOf('do-orca · FUNIFIER');
     expect(i).toBeGreaterThanOrEqual(0);
-    expect(chat.textos()).not.toContain(join(raiz, 'repos', 'FUNIFIER', 'novo-app')); // já está no Muxor
-    expect(await configurar.onAcao(s, 'orca', String(i))).toBe('Projeto ligado');
+    expect(chat.textos()).not.toContain('novo-app · FUNIFIER'); // já está no Muxor
+    expect(await configurar.onAcao(s, 'pasta', String(i))).toBe('Projeto ligado');
     expect(adicionados.at(-1)).toBe('do-orca');
     expect(sel(s)).toMatchObject({ app: 'do-orca' });
   });

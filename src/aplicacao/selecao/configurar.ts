@@ -7,8 +7,8 @@
 // Atividade avulsa (/nova, B13): instrucoes → info → espaco → escolher_app → (alvo) → confirmar
 // (alvo) só quando o app usa gamificações da Funifier.
 // Lote: a líder passa pela conversa uma vez pelo lote todo; as outras têm lote_de = líder e acompanham o estado dela.
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { basename, dirname, extname, join } from 'node:path';
 import { CAMINHOS } from '../../caminhos.js';
 import { espacoDe, nomeEspaco, type App, type Catalogo, type Gamificacao } from '../../config.js';
 import { acaoValida, type Selecao } from '../../dominio/selecao.js';
@@ -128,28 +128,28 @@ export class ConfigurarSelecao {
       }
 
       case 'ambiente':
-        return perguntar('Em qual pasta este projeto roda?', {
-          corpo: ['Escolha uma vez: as próximas tasks do projeto já vêm com ela.'],
+        return perguntar('Ligar este projeto ao Muxor', {
+          rodape: 'Onde está o código dele? Escolha uma vez: as próximas tasks do projeto já vêm com essa pasta.',
           teclado: [
-            [b('📁 Projeto do Muxor', 'amb:existente')],
-            [b('🐋 Projeto do Orca', 'amb:orca')],
-            [b('🆕 Pasta nova', 'amb:novo')],
+            ...(cat.apps.some((a) => this.appServe(s, a)) ? [[b('Um projeto que já está no Muxor', 'amb:existente')]] : []),
+            [b('Um projeto do meu computador', 'amb:computador')],
+            [b('Criar nova pasta', 'amb:novo')],
             cancelarTask(s.id),
           ],
         });
 
-      case 'escolher_orca': {
-        // Os projetos do Orca que ainda não estão no Muxor; a lista fica guardada para o botão apontar pelo número.
-        const noMuxor = new Set(cat.apps.map((a) => a.pasta));
-        const repos = (await this.d.executor.listRepos().catch(() => [])).filter((r) => !noMuxor.has(r.path));
-        if (!repos.length) {
+      case 'escolher_pasta': {
+        // Os projetos do computador que ainda não estão no Muxor: os abertos no Orca e as pastas dentro dos espaços,
+        // numa lista só. A lista fica guardada para o botão apontar pelo número.
+        const candidatas = await this.pastasForaDoMuxor(cat);
+        if (!candidatas.length) {
           this.atualizar(s.id, { etapa: 'ambiente' });
-          await this.d.notificador.enviar(cartao({ icone: ICONE.aviso, titulo: 'Nenhum projeto do Orca fora do Muxor', contexto: ['escolha outra opção'] }));
+          await this.d.notificador.enviar(cartao({ icone: ICONE.aviso, titulo: 'Nenhum projeto do computador fora do Muxor', contexto: ['escolha outra opção'] }));
           return this.proximaPergunta();
         }
-        this.atualizar(s.id, { ambiente: JSON.stringify({ orca: repos.slice(0, 30).map((r) => r.path) }) });
-        return perguntar('Qual projeto do Orca?', {
-          teclado: [...repos.slice(0, 30).map((r, i) => [b(r.displayName || r.path.split('/').at(-1)!, `orca:${i}`)]), cancelarTask(s.id)],
+        this.atualizar(s.id, { ambiente: JSON.stringify({ pastas: candidatas.map((c) => c.pasta) }) });
+        return perguntar('Qual projeto?', {
+          teclado: [...candidatas.map((c, i) => [b(c.rotulo, `pasta:${i}`)]), cancelarTask(s.id)],
         });
       }
 
@@ -310,6 +310,25 @@ export class ConfigurarSelecao {
   }
 
   // Retorna o texto para a resposta do toque no botão.
+  // Pastas de projeto que ainda não estão no Muxor: as do Orca e as de dentro dos espaços, sem repetir (até 30).
+  private async pastasForaDoMuxor(cat: Catalogo): Promise<{ pasta: string; rotulo: string }[]> {
+    const noMuxor = new Set(cat.apps.map((a) => a.pasta));
+    const vistas = new Map<string, string>();
+    for (const r of await this.d.executor.listRepos().catch(() => [])) if (!noMuxor.has(r.path)) vistas.set(r.path, r.displayName && !r.displayName.includes('/') ? r.displayName : basename(r.path));
+    for (const e of cat.espacos) {
+      if (!existsSync(e.pasta)) continue;
+      for (const n of readdirSync(e.pasta)) {
+        const p = join(e.pasta, n);
+        if (n.startsWith('.') || noMuxor.has(p) || vistas.has(p) || !statSync(p).isDirectory()) continue;
+        vistas.set(p, n);
+      }
+    }
+    // O nome e a pasta de cima, para saber onde está: "app-pedidos · EMPRESA".
+    return [...vistas]
+      .slice(0, 30)
+      .map(([pasta, nome]) => ({ pasta, rotulo: `${nome} · ${basename(dirname(pasta))}` }));
+  }
+
   async onAcao(selId: number, acao: string, arg: string | undefined): Promise<string> {
     const s = this.d.selecoes.obter(selId);
     if (s) vincular({ selecaoId: s.id });
@@ -347,13 +366,13 @@ export class ConfigurarSelecao {
         break;
       }
       case 'amb':
-        this.atualizar(s.id, { etapa: arg === 'novo' ? 'amb_espaco' : arg === 'orca' ? 'escolher_orca' : 'escolher_app' });
+        this.atualizar(s.id, { etapa: arg === 'novo' ? 'amb_espaco' : arg === 'computador' ? 'escolher_pasta' : 'escolher_app' });
         break;
-      case 'orca': {
-        const pasta = (JSON.parse(s.ambiente ?? '{}') as { orca?: string[] }).orca?.[Number(arg)];
+      case 'pasta': {
+        const pasta = (JSON.parse(s.ambiente ?? '{}') as { pastas?: string[] }).pastas?.[Number(arg)];
         if (!pasta) return 'Projeto inválido.';
         await tirarBotoes();
-        return (await this.ambientes.trazerDoOrca(s, pasta)) ? 'Projeto ligado' : 'Não deu certo';
+        return (await this.ambientes.trazerPasta(s, pasta)) ? 'Projeto ligado' : 'Não deu certo';
       }
       case 'aesp':
         if (!arg || !espacoDe(cat, arg)) return 'Espaço inválido.';
