@@ -15,6 +15,7 @@ import { limparRunsManual } from './limpeza.js';
 import { LoginPm } from './login-pm.js';
 import { instalarRegistro, limparMensagens } from './mensagens.js';
 import { Projetos } from './projetos.js';
+import { Ferramentas, ferramentasOcultas, ferramentasVisiveis } from './ferramentas.js';
 import { ConfirmadorTelegram } from './confirmacao.js';
 import { Regras } from './regras.js';
 import { NOME_FERRAMENTA } from './dominio/selecao.js';
@@ -34,6 +35,7 @@ const DA_FUNIFIER = [
 ];
 export const DO_MENU = [
   { command: 'status', description: 'Orca, ferramentas, fila e despachos' },
+  { command: 'ferramentas', description: 'Ferramentas de gestão que entram na listagem' },
   { command: 'projetos', description: 'Projetos que entram na listagem' },
   { command: 'regras', description: 'Regras de trabalho por espaço' },
   { command: 'limpar', description: 'Limpa a conversa' },
@@ -115,6 +117,7 @@ export function instalarBot(bot: Bot, deps: Deps) {
 
   const regras = new Regras(db, bot.api, chatId);
   const projetos = new Projetos(db, bot.api, chatId);
+  const ferramentas = new Ferramentas(db, bot.api, chatId, deps.adapters);
   const gamificacoes = new Gamificacoes(db, bot.api, chatId, cofre);
   const loginPm = new LoginPm(bot.api, chatId);
   selecao.configurar.cadastrarGamificacao = (app, selecaoId) => gamificacoes.iniciar(app, selecaoId);
@@ -123,7 +126,8 @@ export function instalarBot(bot: Bot, deps: Deps) {
   selecao.configurar.onDespachar = (id) => despacho.despachar.enfileirar(id);
 
   bot.command('tarefas', async (ctx) => {
-    const nomes = deps.adapters.map((a) => NOME_FERRAMENTA[a.nome] ?? a.nome);
+    const nomes = ferramentasVisiveis(db, deps.adapters).map((a) => NOME_FERRAMENTA[a.nome] ?? a.nome);
+    if (!nomes.length && deps.adapters.length) return void (await ctx.reply('Todas as ferramentas de gestão estão desligadas. Ligue pelo /ferramentas.'));
     await ctx.reply(nomes.length ? `Buscando suas tasks no ${nomes.join(' e no ')}` : 'Nenhuma ferramenta de gestão configurada. Use /nova para atividades avulsas.');
     if (!nomes.length) return;
     await selecao.resumo.enviar('manual');
@@ -139,6 +143,7 @@ export function instalarBot(bot: Bot, deps: Deps) {
     if (!/marcada$/.test(r)) await ctx.reply(r);
   });
   bot.command('projetos', () => projetos.comando());
+  bot.command('ferramentas', () => ferramentas.comando());
   bot.command('regras', () => regras.comando());
   bot.command('gamificacoes', () => gamificacoes.comando());
   bot.command('pm_login', () => loginPm.comando());
@@ -179,6 +184,7 @@ export function instalarBot(bot: Bot, deps: Deps) {
     else if (tipo === 'g') resposta = await regras.onBotao(a, b, ctx.callbackQuery.message!.message_id);
     else if (tipo === 'm') resposta = await gamificacoes.onBotao(a, b, c, ctx.callbackQuery.message!.message_id);
     else if (tipo === 'p') resposta = await projetos.alternar(Number(a), ctx.callbackQuery.message!.message_id);
+    else if (tipo === 'fg') resposta = await ferramentas.alternar(a, ctx.callbackQuery.message!.message_id);
     else if (tipo === 'k') resposta = await confirmador.onBotao(a, b, ctx.callbackQuery.message!.message_id);
     else if (tipo === 'l') {
       const msgId = ctx.callbackQuery.message!.message_id;
@@ -241,9 +247,10 @@ async function montarStatus({ env, db, orca, adapters }: Deps): Promise<string> 
   } catch (e) {
     conexoes.push(`🔴 Orca inacessível: ${escapeHtml((e as Error).message)}`);
   }
+  const ocultas = ferramentasOcultas(db);
   for (const a of adapters) {
     try {
-      conexoes.push(`🟢 ${a.nome} · ${escapeHtml(await a.ping())}`);
+      conexoes.push(`🟢 ${a.nome} · ${escapeHtml(await a.ping())}${ocultas.has(a.nome) ? ' · fora da listagem (/ferramentas)' : ''}`);
     } catch (e) {
       conexoes.push(`🔴 ${a.nome}: ${escapeHtml((e as Error).message)}`);
     }

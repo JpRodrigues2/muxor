@@ -43,7 +43,7 @@ logins, permissões) ele pede na hora, com o passo a passo.
 No Telegram, no bot que você criou:
 - `/tarefas`: as suas tasks, um projeto por mensagem. Marque nas caixinhas embaixo de cada mensagem e toque em ▶️ Iniciar.
 - `/nova <instruções>`: uma atividade avulsa, sem ferramenta de gestão.
-- `/menu`: os outros comandos (status, projetos, regras, limpar…).
+- `/menu`: os outros comandos (status, ferramentas, projetos, regras, limpar). Em `/ferramentas` você tira uma ferramenta de gestão da listagem sem desconectar.
 
 Na primeira task de cada projeto, o Claude pergunta se confia na pasta: o Muxor avisa no Telegram, e você responde
 "Yes" no Orca (no Mac ou no celular). Só uma vez por pasta.

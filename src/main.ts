@@ -19,6 +19,7 @@ import { CAMINHOS, ROOT } from './caminhos.js';
 import { adicionarApp, ligarProjeto, loadCatalogo, loadEnv, migrarCatalogo, type Env } from './config.js';
 import { tolerarConexaoOciosa } from './conexao-ociosa.js';
 import { openDb } from './db.js';
+import { ferramentasVisiveis } from './ferramentas.js';
 import { gitProjetos } from './git.js';
 import { INTERVALO_HEARTBEAT_MS, baterCoracao } from './heartbeat.js';
 import { limparRuns } from './limpeza.js';
@@ -87,7 +88,7 @@ const selecao = criarSelecao({
   notificador,
   catalogo: { atual: loadCatalogo, adicionarApp, ligarProjeto },
   git: gitProjetos,
-  buscar: () => buscarTasks(adapters, db),
+  buscar: () => buscarTasks(ferramentasVisiveis(db, adapters), db),
   ferramentas: adapters.length,
   filtrar: (tasks) => filtrarPorProjeto(db, tasks),
 });

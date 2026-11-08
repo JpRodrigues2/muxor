@@ -62,7 +62,8 @@ export class ResumoDiario {
       const busca = await this.d.buscar();
       const filtro = this.d.filtrar(busca.tasks);
       const r = { ...busca, tasks: filtro.visiveis };
-      if (r.erros.length === this.d.ferramentas) {
+      if (!r.ferramentas.length) return false; // todas desligadas no /ferramentas
+      if (r.erros.length === r.ferramentas.length) {
         await notificador.enviar(
           cartao({ icone: ICONE.falha, titulo: 'Não consegui buscar as tasks', corpo: r.erros.map((e) => `${esc(e.ferramenta)}: ${esc(e.erro)}`) }),
         );

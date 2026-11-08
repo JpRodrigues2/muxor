@@ -14,7 +14,7 @@ describe('comandos do Telegram (B42)', () => {
 
   it('o /menu tem os usados raramente, sem repetir os da lista', () => {
     const lista = new Set(nomes(comandosDaLista({ funifier: true })));
-    expect(nomes(DO_MENU)).toEqual(['status', 'projetos', 'regras', 'limpar', 'limpar_runs']);
+    expect(nomes(DO_MENU)).toEqual(['status', 'ferramentas', 'projetos', 'regras', 'limpar', 'limpar_runs']);
     expect(nomes(DO_MENU).some((c) => lista.has(c))).toBe(false);
   });
 });
