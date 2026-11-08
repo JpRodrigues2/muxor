@@ -96,7 +96,7 @@ describe('resumo e conversa até o despacho', () => {
   it('resumo por projeto (B20): uma caixinha por task embaixo da mensagem e, no fim, os botões de iniciar', async () => {
     expect(await resumo.enviar('manual')).toBe(true);
     const comBotoes = chat.mensagens.find((m) => m.teclado)!;
-    expect(comBotoes.html).toMatch(/📋 <b>Projeto X<\/b>/);
+    expect(comBotoes.html).toMatch(/^<b>Projeto X<\/b>/);
     expect(comBotoes.html).toMatch(/<b>1\.<\/b> <a href="https:\/\/pm\/a1">Ranking semanal<\/a>/);
     expect(chat.dados(comBotoes)).toEqual(['t:1:1', 't:1:2', 'r:1:go', 'r:1:lote', 'r:1:none']);
     expect(chat.textos(comBotoes)[0]).toMatch(/^⬜ 1\. Ranking semanal/);

@@ -9,11 +9,11 @@
 // Exemplo:  📊 <b>Muxor online</b>
 //           hub-cloud · versão 9b493fb · broker ligado · nada rodando
 //
-// Um ícone só, no título, e sempre com o mesmo significado (ver ICONE). Nada de ícone decorativo.
+// Ícone só quando diz algo num relance (estado: ok, falha, alerta, espera você). Assunto não leva ícone ('').
 import { escapeHtml } from './resumo.js';
 
 export const ICONE = {
-  lista: '📋', // lista de tasks
+  lista: '', // lista de tasks
   pergunta: '❓', // espera uma resposta sua (botão ou texto)
   fila: '⏳', // na fila / esperando a sessão
   rodando: '▶️', // começou a rodar no Claude
@@ -25,11 +25,11 @@ export const ICONE = {
   falha: '❌', // interrompida / deu errado
   aviso: '⚠️', // algo não saiu como esperado, mas o fluxo segue
   pr: '🔀', // pull request
-  sessao: '🖥️', // sessão do Claude aberta pelo hub
-  anexo: '📎',
-  projetos: '📂',
-  regras: '📄',
-  limpar: '🧹',
+  sessao: '', // sessão do Claude aberta pelo hub
+  anexo: '',
+  projetos: '',
+  regras: '',
+  limpar: '',
   status: '📊',
   cancelado: '✖️',
 } as const;

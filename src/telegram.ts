@@ -124,7 +124,7 @@ export function instalarBot(bot: Bot, deps: Deps) {
 
   bot.command('tarefas', async (ctx) => {
     const nomes = deps.adapters.map((a) => NOME_FERRAMENTA[a.nome] ?? a.nome);
-    await ctx.reply(nomes.length ? `🔎 Buscando suas tasks no ${nomes.join(' e no ')}…` : '⚠️ Nenhuma ferramenta de gestão configurada. Use /nova para atividades avulsas.');
+    await ctx.reply(nomes.length ? `Buscando suas tasks no ${nomes.join(' e no ')}` : 'Nenhuma ferramenta de gestão configurada. Use /nova para atividades avulsas.');
     if (!nomes.length) return;
     await selecao.resumo.enviar('manual');
   });

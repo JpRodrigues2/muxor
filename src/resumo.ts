@@ -47,17 +47,18 @@ export function escapeHtml(s: string) {
 }
 
 // Status como etiqueta na linha (B20); concluídas e canceladas não entram.
+// Só o atraso leva cor: é o que precisa saltar aos olhos. O resto é texto.
 const ETIQUETA: Partial<Record<Categoria, string>> = {
   atrasada: '🔴 atrasada',
-  em_progresso: '🔵 em progresso',
-  pendente: '🟡 a fazer',
-  backlog: '⚪ backlog',
-  revisao: '🟣 em revisão',
+  em_progresso: 'em progresso',
+  pendente: 'a fazer',
+  backlog: 'backlog',
+  revisao: 'em revisão',
 };
 
 function formatarPrazo(prazo: string | null, tz: string) {
   if (!prazo) return null;
-  return `⏰ ${new Intl.DateTimeFormat('pt-BR', { timeZone: tz, day: '2-digit', month: '2-digit' }).format(new Date(prazo))}`;
+  return `prazo ${new Intl.DateTimeFormat('pt-BR', { timeZone: tz, day: '2-digit', month: '2-digit' }).format(new Date(prazo))}`;
 }
 
 export interface ItemResumo {
@@ -133,7 +134,7 @@ export function montarResumo(r: ResultadoBusca, cat: Catalogo, tz: string, rotul
     const erro = r.erros.find((e) => e.ferramenta === ferramenta);
     if (erro || !abertas.length) {
       const corpo = erro ? `⚠️ Não consegui buscar: ${escapeHtml(erro.erro)}` : 'Nenhuma task aberta.';
-      blocos.push({ ferramenta, texto: `📋 <b>${escapeHtml(nomeFer)}</b>\n<i>${rotulo}</i>\n\n${corpo}`, itens: [] });
+      blocos.push({ ferramenta, texto: `<b>${escapeHtml(nomeFer)}</b>\n${rotulo}\n\n${corpo}`, itens: [] });
       continue;
     }
     const projetos = [...new Set(abertas.map((t) => t.projetoId ?? ''))];
@@ -154,11 +155,11 @@ export function montarResumo(r: ResultadoBusca, cat: Catalogo, tz: string, rotul
           itens.push(item);
           linhas.push(linhaTask(item, tz, l.filha));
         }
-        corpo.push([...(g.sprint ? [`🗓 <b>${escapeHtml(g.sprint)}</b>`] : []), ...linhas].join('\n'));
+        corpo.push([...(g.sprint ? [`<b>${escapeHtml(g.sprint)}</b>`] : []), ...linhas].join('\n'));
       }
       const n = doProjeto.length;
-      const contexto = [nomeFer, rotulo, `${n} task${n === 1 ? '' : 's'}`, ...(app ? [] : ['sem ambiente: configuro ao iniciar'])].join(' · ');
-      blocos.push({ ferramenta, texto: [`📋 <b>${escapeHtml(nomeProjeto)}</b>\n<i>${contexto}</i>`, ...corpo].join('\n\n'), itens });
+      const contexto = [nomeFer, `${n} task${n === 1 ? '' : 's'}`, ...(app ? [] : ['sem pasta, escolho ao iniciar'])].join(' · ');
+      blocos.push({ ferramenta, texto: [`<b>${escapeHtml(nomeProjeto)}</b>\n${contexto}`, ...corpo].join('\n\n'), itens });
     }
   }
   return blocos;

@@ -37,10 +37,10 @@ describe('listagem por projeto (B20)', () => {
     ]);
     const linhas = b.texto.split('\n');
     expect(linhas.findIndex((l) => l.includes('Novembro 2026'))).toBeLessThan(linhas.findIndex((l) => l.includes('<b>1.</b> ')));
-    expect(b.texto).toMatch(/<b>1\.<\/b> Task pai\n\s+<i>🔵 em progresso<\/i>/);
+    expect(b.texto).toMatch(/<b>1\.<\/b> Task pai\n\s+<i>em progresso<\/i>/);
     expect(b.texto).toMatch(/ {3}↳ <b>2\.<\/b> Task filha-1/);
     expect(b.texto).toMatch(/<b>Mensageria :: Ajustes<\/b>\n {3}↳ <b>4\.<\/b> Task orfa/);
-    expect(b.texto).toMatch(/Joga Junto<\/b>\n<i>Funifier PM · Suas tasks · 5 tasks<\/i>/);
+    expect(b.texto).toMatch(/Joga Junto<\/b>\nFunifier PM · 5 tasks/);
   });
 
   it('um bloco por projeto, numeração contínua; sem app avisa que configura ao iniciar', () => {
@@ -50,11 +50,11 @@ describe('listagem por projeto (B20)', () => {
       'America/Sao_Paulo',
     );
     expect(blocos.map((b) => [b.texto.split('\n')[0], b.itens.map((i) => i.idx)])).toEqual([
-      ['📋 <b>Joga Junto</b>', [1]],
-      ['📋 <b>Outro</b>', [2]],
+      ['<b>Joga Junto</b>', [1]],
+      ['<b>Outro</b>', [2]],
     ]);
-    expect(blocos[1].texto).toMatch(/sem ambiente: configuro ao iniciar/);
-    expect(blocos[0].texto).not.toMatch(/sem ambiente/);
+    expect(blocos[1].texto).toMatch(/sem pasta, escolho ao iniciar/);
+    expect(blocos[0].texto).not.toMatch(/sem pasta/);
   });
 
   it('ferramenta com erro ou sem tasks: um bloco com o aviso', () => {
