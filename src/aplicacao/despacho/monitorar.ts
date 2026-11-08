@@ -115,7 +115,7 @@ export class Monitor {
             icone: ICONE.pausa,
             titulo: nome,
             contexto: [esc(d.app), 'pausada: conta no limite de uso'],
-            rodape: 'Troque de conta no Orca; eu retomo sozinho quando a sessão voltar a trabalhar.',
+            rodape: 'Troque de conta no Orca. Eu retomo sozinho.',
           }),
         );
         await this.dormir(60_000);
@@ -195,7 +195,7 @@ export class Monitor {
         icone: ICONE.falha,
         titulo: sel ? this.tasks.tituloHtml(sel) : `#${d.selecao_id}`,
         contexto: [esc(d.app), 'interrompida: o terminal sumiu'],
-        rodape: 'O Orca reiniciou ou a aba foi fechada. Veja o que ficou na branch e selecione a task de novo se precisar.',
+        rodape: 'A aba fechou ou o Orca reiniciou. Mande a task de novo se precisar.',
       }),
     );
     this.aoLiberar();

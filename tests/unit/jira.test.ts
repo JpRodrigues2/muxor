@@ -83,6 +83,10 @@ describe('Jira (adaptador)', () => {
 
   it('credencial recusada vira mensagem clara', async () => {
     const buscar: FetchJira = async () => new Response('', { status: 401 });
-    await expect(new JiraAdapter(env(), buscar).ping()).rejects.toThrow('Jira: e-mail ou API token recusado');
+    await expect(new JiraAdapter(env(), buscar).ping()).rejects.toThrow('o e-mail ou o API token não foram aceitos');
+    const semRede = (async () => {
+      throw new TypeError('fetch failed');
+    }) as unknown as typeof fetch;
+    await expect(new JiraAdapter(env(), semRede).ping()).rejects.toThrow(/não achei o Jira em .+\. Confira o endereço/);
   });
 });

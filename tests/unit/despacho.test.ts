@@ -139,7 +139,7 @@ describe('despacho de ponta a ponta', () => {
     expect(readFileSync(arquivo, 'utf8')).toMatch(/MCP \*\*hub\*\*/);
     expect(existsSync(join(CAMINHOS.runs, String(sel), 'credenciais.json'))).toBe(false);
     await ate(() => chat.mensagens.some((m) => m.html.includes('rodando')));
-    expect(chat.mensagens[0].html).toMatch(/Abrindo sessão em sandbox/);
+    expect(chat.mensagens[0].html).toMatch(/Abrindo o Claude em sandbox/);
     expect(estadoSel(sel)).toBe('despachada');
     desp = despachoDe(sel).id;
   });

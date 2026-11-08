@@ -93,11 +93,47 @@ export async function preRequisitos(ctx: Ctx) {
     if (fundo.length) tela.ok(`Instalando em segundo plano: ${fundo.map((s) => s.p.nome).join(', ')}.`);
   } else tela.ok('Programas prontos.');
 
+  // Na loja (sem login na App Store) abre uma vez só; nas próximas, só confere.
+  if (!existsSync(AMPHETAMINE) && !ctx.estado.passos.amphetamineLoja) {
+    const r = await tela.esperando('Instalando o Amphetamine, que mantém o Mac acordado', () => amphetamine(), (x) => (x === 'instalado' ? 'Amphetamine instalado' : 'Abri o Amphetamine na App Store'));
+    tela.nota(
+      [
+        ...(r === 'loja' ? ['Na App Store, clique em Obter e depois em Abrir.'] : []),
+        'No ícone da pílula na barra de menus: Start New Session › Indefinitely.',
+        'Em Settings do Amphetamine, marque Launch Amphetamine at login e Start session when Amphetamine launches.',
+      ].join('\n'),
+      'Amphetamine',
+    );
+    if (r === 'loja') ctx.estado.passos.amphetamineLoja = new Date().toISOString();
+  }
   if (!ctx.estado.passos.appsCelular) {
     await tela.link(PAGINA_CELULAR, 'Leia com o celular e instale o Telegram, o Orca e o Tailscale', { qr: true });
     ctx.estado.passos.appsCelular = new Date().toISOString();
     ctx.salvar();
   }
+}
+
+// Amphetamine (Mac App Store, grátis): mantém o Mac acordado com a tampa fechada. O serviço do Muxor já roda dentro do
+// caffeinate, que segura o Mac com a tampa aberta. Instala pelo mas (a App Store pelo terminal); sem login na App Store,
+// abre a página dele para a pessoa clicar em Obter.
+const AMPHETAMINE = '/Applications/Amphetamine.app';
+const AMPHETAMINE_ID = '937984704';
+
+export async function amphetamine() {
+  if (existsSync(AMPHETAMINE)) return;
+  const brewBin = ['/opt/homebrew/bin/brew', '/usr/local/bin/brew'].find(existsSync);
+  const mas = async () => ['/opt/homebrew/bin/mas', '/usr/local/bin/mas'].find(existsSync);
+  if (!(await mas()) && brewBin) await rodar('/usr/bin/env', ['HOMEBREW_NO_AUTO_UPDATE=1', brewBin, 'install', 'mas'], 5 * 60_000);
+  const bin = await mas();
+  for (const args of [['get', AMPHETAMINE_ID], ['install', AMPHETAMINE_ID]]) {
+    if (bin && (await rodar(bin, args, 5 * 60_000)).ok && existsSync(AMPHETAMINE)) break;
+  }
+  if (existsSync(AMPHETAMINE)) {
+    await rodar('open', ['-a', 'Amphetamine']);
+    return 'instalado';
+  }
+  await rodar('open', [`macappstore://apps.apple.com/app/id${AMPHETAMINE_ID}`]);
+  return 'loja';
 }
 
 // Um passo que precisa de um programa espera a instalação dele terminar (ou confere, se já estava instalado).

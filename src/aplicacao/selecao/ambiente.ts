@@ -2,7 +2,7 @@
 //   destino → ambiente → existente (escolher_app, liga o projeto ao app)
 //   ou novo: amb_espaco → amb_nome → amb_git → (amb_url) → cria a pasta/clona, adiciona ao Orca e ao apps.yaml.
 import { existsSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { espacoDe, type App, type Catalogo } from '../../config.js';
 import { FERRAMENTA_REAL, type Selecao } from '../../dominio/selecao.js';
 import { errInfo, log } from '../../logger.js';
@@ -78,8 +78,36 @@ export class Ambientes {
         icone: ICONE.ok,
         titulo: `Ambiente ${esc(amb.nome)} pronto`,
         contexto: [url ? 'clonado' : 'pasta criada', 'no Orca', 'no apps.yaml'],
-        rodape: t.projeto_nome ? `As próximas tasks de ${esc(t.projeto_nome)} já vêm com este app.` : undefined,
+        rodape: t.projeto_nome ? `As próximas tasks de ${esc(t.projeto_nome)} já vêm com esta pasta.` : undefined,
       }),
+    );
+    await this.continuar();
+    return true;
+  }
+
+  // Projeto que já está no Orca (fora do Muxor): entra no Muxor ligado ao projeto da task.
+  async trazerDoOrca(s: Selecao, pasta: string): Promise<boolean> {
+    const { catalogo, selecoes, notificador } = this.d;
+    const cat = catalogo.atual();
+    const t = this.conversa.task(s);
+    const espaco = cat.espacos.find((e) => pasta.startsWith(e.pasta.replace(/\/+$/, '') + '/')) ?? cat.espacos[0];
+    if (!espaco) {
+      await notificador.enviar(cartao({ icone: ICONE.falha, titulo: 'Nenhum espaço configurado', contexto: ['rode muxor init no Mac'] }));
+      return false;
+    }
+    const base = basename(pasta).toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'projeto';
+    const nome = cat.apps.some((a) => a.app === base) ? `${base}-${espaco.id}` : base;
+    try {
+      catalogo.adicionarApp({ app: nome, espaco: espaco.id, ferramenta: s.ferramenta as App['ferramenta'], pasta, projeto: t.projeto_id });
+    } catch (e) {
+      log.warn('ambiente: falha ao trazer do Orca', { selecao: s.id, pasta, ...errInfo(e) });
+      await notificador.enviar(cartao({ icone: ICONE.falha, titulo: `Não consegui trazer ${esc(basename(pasta))}`, contexto: [esc((e as Error).message)] }));
+      return false;
+    }
+    const novo = catalogo.atual().apps.find((a) => a.app === nome);
+    selecoes.atualizar(s.id, { app: nome, ambiente: null, etapa: novo?.gamificacao ? 'alvo' : 'confirmar', gamificacoes: null });
+    await notificador.enviar(
+      cartao({ icone: ICONE.ok, titulo: `${esc(t.projeto_nome ?? 'Projeto')} ligado a ${esc(nome)}`, contexto: ['as próximas tasks já vêm com esta pasta'] }),
     );
     await this.continuar();
     return true;
@@ -94,7 +122,7 @@ export class Ambientes {
       this.d.catalogo.ligarProjeto(app.app, t.projeto_id, s.ferramenta as App['ferramenta']);
       log.info('ambiente: projeto ligado', { app: app.app, projeto: t.projeto_id });
       await this.d.notificador.enviar(
-        cartao({ icone: ICONE.ok, titulo: `${esc(t.projeto_nome ?? t.projeto_id)} ligado a ${esc(app.app)}`, rodape: 'As próximas tasks desse projeto já vêm com este app.' }),
+        cartao({ icone: ICONE.ok, titulo: `${esc(t.projeto_nome ?? t.projeto_id)} ligado a ${esc(app.app)}`, rodape: 'As próximas tasks do projeto já vêm com esta pasta.' }),
       );
     } catch (e) {
       log.warn('ambiente: falha ao ligar projeto', { app: app.app, ...errInfo(e) });

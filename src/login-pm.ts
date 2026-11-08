@@ -31,7 +31,7 @@ export class LoginPm {
             '2. No fim, o navegador mostra uma página de erro em <code>localhost:53682</code>. É normal.',
             '3. Copie o endereço dessa página e cole aqui.',
           ],
-          rodape: 'O código vale por poucos minutos. Apago a sua mensagem assim que ler.',
+          rodape: 'Vale por poucos minutos. Apago a sua mensagem ao ler.',
         }),
         HTML,
       );

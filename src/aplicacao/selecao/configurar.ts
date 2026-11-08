@@ -86,7 +86,7 @@ export class ConfigurarSelecao {
 
     switch (s.etapa) {
       case 'instrucoes':
-        return perguntar('O que o Claude deve fazer?', { rodape: 'Mande as instruções em texto. A primeira linha vira o título.', teclado: [cancelarTask(s.id)] });
+        return perguntar('O que o Claude deve fazer?', { rodape: 'Mande em texto. A primeira linha vira o título.', teclado: [cancelarTask(s.id)] });
 
       case 'espaco': {
         if (cat.espacos.length === 1) {
@@ -94,14 +94,13 @@ export class ConfigurarSelecao {
           this.atualizar(s.id, { etapa: 'escolher_app', app: null });
           return this.proximaPergunta();
         }
-        if (!cat.espacos.length) return perguntar('Nenhum espaço configurado', { rodape: 'Rode o hub init no terminal para criar um.', teclado: [cancelarTask(s.id)] });
+        if (!cat.espacos.length) return perguntar('Nenhum espaço configurado', { rodape: 'Rode muxor init no Mac.', teclado: [cancelarTask(s.id)] });
         return perguntar('Em qual espaço?', { teclado: [...this.botoesEspacos(cat, b, 'esp'), cancelarTask(s.id)] });
       }
 
       case 'info':
         return perguntar('Algo a acrescentar?', {
-          corpo: ['O que foi falado em reunião, no Teams, prints ou arquivos.'],
-          rodape: 'Fotos e arquivos: pode mandar vários. Texto: encerra a etapa.',
+          rodape: 'Mande texto, prints ou arquivos. O texto encerra a etapa.',
           teclado: [[b('⏭️ Pular', 'pular')], cancelarTask(s.id)],
         });
 
@@ -129,17 +128,37 @@ export class ConfigurarSelecao {
       }
 
       case 'ambiente':
-        return perguntar('Este projeto ainda não tem ambiente', {
-          corpo: ['Ligo a um app que já existe ou monto um novo (pasta, Orca e hub)?'],
-          teclado: [[b('📁 Usar app existente', 'amb:existente')], [b('🆕 Criar ambiente novo', 'amb:novo')], cancelarTask(s.id)],
+        return perguntar('Em qual pasta este projeto roda?', {
+          corpo: ['Escolha uma vez: as próximas tasks do projeto já vêm com ela.'],
+          teclado: [
+            [b('📁 Projeto do Muxor', 'amb:existente')],
+            [b('🐋 Projeto do Orca', 'amb:orca')],
+            [b('🆕 Pasta nova', 'amb:novo')],
+            cancelarTask(s.id),
+          ],
         });
+
+      case 'escolher_orca': {
+        // Os projetos do Orca que ainda não estão no Muxor; a lista fica guardada para o botão apontar pelo número.
+        const noMuxor = new Set(cat.apps.map((a) => a.pasta));
+        const repos = (await this.d.executor.listRepos().catch(() => [])).filter((r) => !noMuxor.has(r.path));
+        if (!repos.length) {
+          this.atualizar(s.id, { etapa: 'ambiente' });
+          await this.d.notificador.enviar(cartao({ icone: ICONE.aviso, titulo: 'Nenhum projeto do Orca fora do Muxor', contexto: ['escolha outra opção'] }));
+          return this.proximaPergunta();
+        }
+        this.atualizar(s.id, { ambiente: JSON.stringify({ orca: repos.slice(0, 30).map((r) => r.path) }) });
+        return perguntar('Qual projeto do Orca?', {
+          teclado: [...repos.slice(0, 30).map((r, i) => [b(r.displayName || r.path.split('/').at(-1)!, `orca:${i}`)]), cancelarTask(s.id)],
+        });
+      }
 
       case 'amb_espaco': {
         if (cat.espacos.length === 1) {
           this.atualizar(s.id, { etapa: 'amb_nome', ambiente: JSON.stringify({ espaco: cat.espacos[0].id }) });
           return this.proximaPergunta();
         }
-        if (!cat.espacos.length) return perguntar('Nenhum espaço configurado', { rodape: 'Rode o hub init no terminal para criar um.', teclado: [cancelarTask(s.id)] });
+        if (!cat.espacos.length) return perguntar('Nenhum espaço configurado', { rodape: 'Rode muxor init no Mac.', teclado: [cancelarTask(s.id)] });
         return perguntar('Em qual espaço criar a pasta?', {
           corpo: cat.espacos.map((e) => `${esc(nomeEspaco(e))}: <code>${esc(e.pasta)}</code>`),
           teclado: [...this.botoesEspacos(cat, b, 'aesp'), cancelarTask(s.id)],
@@ -148,7 +167,7 @@ export class ConfigurarSelecao {
 
       case 'amb_nome':
         return perguntar('Nome do diretório?', {
-          rodape: 'Também vira o nome do app no hub. Use minúsculas, números e - (ex.: bb-joga-junto).',
+          rodape: 'Minúsculas, números e -. Ex.: app-pedidos',
           teclado: [cancelarTask(s.id)],
         });
 
@@ -156,13 +175,13 @@ export class ConfigurarSelecao {
         const amb = JSON.parse(s.ambiente ?? '{}') as { espaco: string; nome: string };
         return perguntar('Tem URL do Git para clonar?', {
           corpo: [campo('Pasta', `<code>${esc(pastaAmbiente(cat, amb))}</code>`)],
-          rodape: 'Sem URL eu crio a pasta com um git só local (sem remoto), que o Orca exige.',
+          rodape: 'Sem URL, crio uma pasta vazia.',
           teclado: [[b('🔗 Tenho a URL', 'agit:url'), b('📁 Só criar a pasta', 'agit:pasta')], cancelarTask(s.id)],
         });
       }
 
       case 'amb_url':
-        return perguntar('Qual a URL do Git?', { rodape: 'HTTPS ou SSH. Uso o acesso ao Git que já existe no computador.', teclado: [cancelarTask(s.id)] });
+        return perguntar('Qual a URL do Git?', { rodape: 'HTTPS ou SSH.', teclado: [cancelarTask(s.id)] });
 
       case 'escolher_app': {
         const apps = cat.apps.filter((a) => this.appServe(s, a));
@@ -328,8 +347,14 @@ export class ConfigurarSelecao {
         break;
       }
       case 'amb':
-        this.atualizar(s.id, { etapa: arg === 'novo' ? 'amb_espaco' : 'escolher_app' });
+        this.atualizar(s.id, { etapa: arg === 'novo' ? 'amb_espaco' : arg === 'orca' ? 'escolher_orca' : 'escolher_app' });
         break;
+      case 'orca': {
+        const pasta = (JSON.parse(s.ambiente ?? '{}') as { orca?: string[] }).orca?.[Number(arg)];
+        if (!pasta) return 'Projeto inválido.';
+        await tirarBotoes();
+        return (await this.ambientes.trazerDoOrca(s, pasta)) ? 'Projeto ligado' : 'Não deu certo';
+      }
       case 'aesp':
         if (!arg || !espacoDe(cat, arg)) return 'Espaço inválido.';
         this.atualizar(s.id, { etapa: 'amb_nome', ambiente: JSON.stringify({ espaco: arg }) });

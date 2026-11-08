@@ -77,7 +77,7 @@ export class Projetos {
       cartao({
         icone: ICONE.projetos,
         titulo: 'Projetos na listagem',
-        rodape: 'Toque para ligar ou desligar. Desligado some do resumo e do /tarefas; nada muda na ferramenta. Projeto novo entra ligado.',
+        rodape: 'Toque para ligar ou desligar. Desligado some do /tarefas.',
       }),
       { parse_mode: 'HTML', reply_markup: this.teclado(ps) },
     );

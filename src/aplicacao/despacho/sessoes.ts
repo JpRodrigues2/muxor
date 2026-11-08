@@ -1,6 +1,8 @@
 // Sessões do Claude no executor (Orca): achar uma ociosa na pasta do app, ler o estado de um terminal e,
 // quando não há nenhuma, abrir uma nova.
 import { existsSync, readdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import { dirSessoesClaude } from '../../caminhos.js';
 import type { App } from '../../config.js';
 import type { Selecao } from '../../dominio/selecao.js';
@@ -22,6 +24,14 @@ export interface LeituraSessao {
   estado: EstadoSessao;
   tela: string;
   agente?: AgenteExecutor;
+}
+
+// O claude pelo caminho completo, no Mac: o terminal que o Orca abre nem sempre lê o ~/.zprofile (onde o instalador
+// põe ~/.local/bin no PATH) e aí não acha o claude; a sessão não abria. No servidor a sessão roda com outro usuário
+// (o agente), então fica só "claude", que o PATH dele resolve.
+export function binClaude(plataforma = process.platform, existe = existsSync, casa = homedir()) {
+  if (plataforma !== 'darwin') return 'claude';
+  return [join(casa, '.local', 'bin', 'claude'), '/opt/homebrew/bin/claude', '/usr/local/bin/claude'].find((p) => existe(p)) ?? 'claude';
 }
 
 export class Sessoes {
@@ -75,17 +85,34 @@ export class Sessoes {
 
   private async abrir(app: App, sel: Selecao): Promise<TerminalExecutor | null> {
     const { executor, env, notificador } = this.d;
-    const base = app.sessao_resume_id ? `claude --resume ${app.sessao_resume_id}` : temSessaoAnterior(app.pasta) ? 'claude -c' : 'claude';
+    // A aba desta task já existe e não virou uma sessão do Claude: o claude não abriu nela. Avisar em vez de abrir
+    // outra aba a cada volta (eram três abas "hub #2" vazias).
+    const aba = `hub #${sel.id}`;
+    if ((await executor.listTerminals(app.pasta).catch(() => [])).some((t) => t.title === aba)) {
+      await this.tasks.avisar(
+        sel,
+        'sessao_sem_claude',
+        cartao({
+          icone: ICONE.falha,
+          titulo: `${esc(app.app)}: o Claude não abriu`,
+          contexto: [`Veja a aba ${aba} no Orca. Feche a aba para eu tentar de novo`],
+        }),
+      );
+      return null;
+    }
+    const claude = binClaude();
+    const base = app.sessao_resume_id ? `${claude} --resume ${app.sessao_resume_id}` : temSessaoAnterior(app.pasta) ? `${claude} -c` : claude;
     // Login do GitHub do espaço (O5): o gh da sessão usa a conta certa para o PR.
     const gh = app.gh_config ? `GH_CONFIG_DIR=${app.gh_config} ` : '';
     const comando = `${gh}${base} --permission-mode ${env.HUB_CLAUDE_PERMISSAO}`;
-    if (!/^(GH_CONFIG_DIR=\/[A-Za-z0-9/._-]+ )?claude( -c| --resume [A-Za-z0-9-]+)? --permission-mode [A-Za-z]+$/.test(comando)) throw new Error(`comando inesperado: ${comando}`);
-    await notificador.enviar(cartao({ icone: ICONE.sessao, titulo: `Abrindo sessão em ${esc(app.app)}`, contexto: [`<code>${esc(comando)}</code>`] }));
+    if (!/^(GH_CONFIG_DIR=\/[A-Za-z0-9/._-]+ )?(\/[A-Za-z0-9/._-]+\/)?claude( -c| --resume [A-Za-z0-9-]+)? --permission-mode [A-Za-z]+$/.test(comando))
+      throw new Error(`comando inesperado: ${comando}`);
+    await notificador.enviar(cartao({ icone: ICONE.sessao, titulo: `Abrindo o Claude em ${esc(app.app)}`, contexto: [`aba ${aba} no Orca`] }));
     // No servidor, antes do Claude, marca a pasta como confiável no Claude do agente (senão ele para perguntando).
     const linha = env.HUB_CONFIAR_PASTA_CMD ? `${env.HUB_CONFIAR_PASTA_CMD} && ${comando}` : comando;
     // Pasta do catálogo que o Orca ainda não conhece (servidor novo, pasta criada fora do hub): adiciona antes.
     if (!(await executor.listRepos()).some((r) => r.path === app.pasta)) await executor.addRepo(app.pasta);
-    const handle = await executor.createTerminal(app.pasta, linha, `hub #${sel.id}`);
+    const handle = await executor.createTerminal(app.pasta, linha, aba);
     log.info('despacho: sessão aberta', { app: app.app, handle, comando });
 
     const limite = Date.now() + ESPERA_SESSAO_NOVA_MS;

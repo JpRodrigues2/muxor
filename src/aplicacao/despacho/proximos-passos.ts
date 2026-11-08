@@ -127,7 +127,7 @@ export class ProximosPassos {
             icone: ICONE.pergunta,
             titulo: 'Qual a instrução?',
             contexto: [this.tasks.tituloHtml(sel), esc(desp.app)],
-            rodape: 'Mande em texto. Vai para a mesma sessão e eu acompanho até o novo resultado.',
+            rodape: 'Mande em texto. Vai para a mesma sessão.',
           }),
           cancelar,
         );
@@ -146,7 +146,7 @@ export class ProximosPassos {
           icone: ICONE.pergunta,
           titulo: 'PR para qual branch?',
           contexto: [this.tasks.tituloHtml(sel), esc(desp.app)],
-          rodape: bases.length ? 'Toque numa opção ou escreva o nome.' : 'Escreva o nome (não achei as branches usuais no origin).',
+          rodape: bases.length ? 'Toque numa opção ou escreva o nome.' : 'Escreva o nome da branch.',
         }),
         [...linhas, ...cancelar],
       );
@@ -158,7 +158,7 @@ export class ProximosPassos {
     if (acao === 'no') {
       await this.setConversa(null);
       if (desp.estado === 'concluido' && desp.msg_fechamento) await notificador.botoes(desp.msg_fechamento, tecladoFechamento(desp.id));
-      await notificador.enviar(cartao({ icone: ICONE.cancelado, titulo: 'Cancelado', rodape: 'Os botões voltaram na mensagem do resultado.' }));
+      await notificador.enviar(cartao({ icone: ICONE.cancelado, titulo: 'Cancelado', rodape: 'Os botões voltaram no resultado.' }));
       return 'Cancelado';
     }
     if ((acao === 'xs' || acao === 'xn') && conv.tipo === 'encerrar') {
@@ -240,7 +240,7 @@ export class ProximosPassos {
         titulo: 'Confirma o PR?',
         contexto: [this.tasks.tituloHtml(sel), esc(desp.app)],
         corpo: [campo('Repositório', `<code>${esc(remoto ?? 'origin')}</code>`), campo('De', de), campo('Para', `<code>${esc(base)}</code>`)],
-        rodape: 'Push da branch e PR aberto, sem merge. O push pode pedir sua aprovação no Orca.',
+        rodape: 'Push e PR, sem merge. O push pode pedir aprovação no Orca.',
       }),
       [
         [botao('✔ Confirmar', `f:${desp.id}:ok`), botao('✏️ Nome da branch', `f:${desp.id}:bn`)],

@@ -41,7 +41,7 @@ logins, permissões) ele pede na hora, com o passo a passo.
 ## 3. Use
 
 No Telegram, no bot que você criou:
-- `/tarefas`: as suas tasks, um projeto por mensagem. Toque no número (`/t1`, `/t2`…) para marcar e depois em ▶️ Iniciar.
+- `/tarefas`: as suas tasks, um projeto por mensagem. Marque nas caixinhas embaixo de cada mensagem e toque em ▶️ Iniciar.
 - `/nova <instruções>`: uma atividade avulsa, sem ferramenta de gestão.
 - `/menu`: os outros comandos (status, projetos, regras, limpar…).
 

@@ -93,28 +93,29 @@ afterAll(() => db.close());
 describe('resumo e conversa até o despacho', () => {
   let s = 0;
 
-  it('resumo por projeto (B20): o número da task na linha é o comando de marcar; botões só de iniciar', async () => {
+  it('resumo por projeto (B20): uma caixinha por task embaixo da mensagem e, no fim, os botões de iniciar', async () => {
     expect(await resumo.enviar('manual')).toBe(true);
     const comBotoes = chat.mensagens.find((m) => m.teclado)!;
     expect(comBotoes.html).toMatch(/📋 <b>Projeto X<\/b>/);
-    expect(comBotoes.html).toMatch(/⬜ \/t1 <a href="https:\/\/pm\/a1">Ranking semanal<\/a>/);
-    expect(comBotoes.html).toMatch(/⬜ \/t2 /);
-    expect(chat.dados(comBotoes)).toEqual(['r:1:go', 'r:1:lote', 'r:1:none']);
+    expect(comBotoes.html).toMatch(/<b>1\.<\/b> <a href="https:\/\/pm\/a1">Ranking semanal<\/a>/);
+    expect(chat.dados(comBotoes)).toEqual(['t:1:1', 't:1:2', 'r:1:go', 'r:1:lote', 'r:1:none']);
+    expect(chat.textos(comBotoes)[0]).toMatch(/^⬜ 1\. Ranking semanal/);
   });
 
-  it('/t1 troca o ⬜ por ✅ na própria linha; iniciar sem marcar é recusado', async () => {
+  it('a caixinha troca ⬜ por ✅ e os botões de iniciar continuam; iniciar sem marcar é recusado', async () => {
     expect(await resumo.finalizar(1, 'go')).toMatch(/Marque pelo menos uma/);
-    expect(await resumo.alternarPorNumero(1)).toBe('Task 1 marcada');
-    const m = chat.mensagens.find((x) => x.html.includes('/t1 '))!;
-    expect(m.html).toMatch(/✅ \/t1 /);
-    expect(m.html).toMatch(/⬜ \/t2 /);
-    expect(chat.dados(m)).toEqual(['r:1:go', 'r:1:lote', 'r:1:none']); // os botões continuam
+    expect(await resumo.alternarItem(1, 1)).toBe('Task 1 marcada');
+    const troca = chat.trocas.at(-1)!;
+    const textos = troca.teclado!.flat().map((b) => b.texto);
+    expect(textos[0]).toMatch(/^✅ 1\./);
+    expect(textos[1]).toMatch(/^⬜ 2\./);
+    expect(troca.teclado!.flat().map((b) => b.dado).slice(-3)).toEqual(['r:1:go', 'r:1:lote', 'r:1:none']);
     expect(await resumo.alternarPorNumero(9)).toMatch(/Não há task 9/);
   });
 
   it('iniciar abre a conversa da task: info extra → app sugerido → gamificações → confirmar → despachar', async () => {
     expect(await resumo.finalizar(1, 'go')).toBe('Configurando 1 task(s)');
-    expect(await resumo.alternarItem(1, 2)).toMatch(/já foi fechado/);
+    expect(await resumo.alternarItem(1, 2)).toMatch(/já foi fechada/);
     s = ultimaSelecao();
     expect(chat.ultima().html).toMatch(/Algo a acrescentar\?/);
 
@@ -217,7 +218,7 @@ describe('ambiente novo (B15)', () => {
     await resumo.finalizar(r, 'go');
     const s = ultimaSelecao();
     await configurar.onAcao(s, 'pular', undefined);
-    expect(chat.ultima().html).toMatch(/ainda não tem ambiente/);
+    expect(chat.ultima().html).toMatch(/Em qual pasta este projeto roda\?/);
     await configurar.onAcao(s, 'amb', 'novo');
     expect(chat.ultima().html).toMatch(/Em qual espaço criar a pasta\?/);
     await configurar.onAcao(s, 'aesp', 'funifier');
@@ -235,5 +236,26 @@ describe('ambiente novo (B15)', () => {
     expect(adicionados).toEqual(['novo-app']);
     expect(sel(s)).toMatchObject({ app: 'novo-app', etapa: 'alvo' });
     expect(chat.ultima().html).toMatch(/novo-app não tem gamificação vinculada/);
+  });
+
+  it('projeto sem app: liga a um projeto que já está no Orca, fora do Muxor', async () => {
+    await configurar.onAcao(ultimaSelecao(), 'cancel', undefined); // a do teste anterior ainda espera a gamificação
+    const doOrca = join(raiz, 'repos', 'FUNIFIER', 'do-orca');
+    repos.push(doOrca);
+    tasks = [task('c2', 'Task de um projeto do Orca', 'p8')];
+    await resumo.enviar('manual');
+    const r = (db.prepare('SELECT MAX(id) id FROM resumos').get() as { id: number }).id;
+    await resumo.alternarItem(r, 1);
+    await resumo.finalizar(r, 'go');
+    const s = ultimaSelecao();
+    await configurar.onAcao(s, 'pular', undefined);
+    await configurar.onAcao(s, 'amb', 'orca');
+    expect(chat.ultima().html).toMatch(/Qual projeto do Orca\?/);
+    const i = chat.textos().indexOf(doOrca);
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(chat.textos()).not.toContain(join(raiz, 'repos', 'FUNIFIER', 'novo-app')); // já está no Muxor
+    expect(await configurar.onAcao(s, 'orca', String(i))).toBe('Projeto ligado');
+    expect(adicionados.at(-1)).toBe('do-orca');
+    expect(sel(s)).toMatchObject({ app: 'do-orca' });
   });
 });

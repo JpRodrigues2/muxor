@@ -36,10 +36,10 @@ describe('listagem por projeto (B20)', () => {
       [5, 'solta'],
     ]);
     const linhas = b.texto.split('\n');
-    expect(linhas.findIndex((l) => l.includes('Novembro 2026'))).toBeLessThan(linhas.findIndex((l) => l.includes('/t1 ')));
-    expect(b.texto).toMatch(/⬜ \/t1 Task pai\n\s+<i>🔵 em progresso<\/i>/);
-    expect(b.texto).toMatch(/ {3}↳ ⬜ \/t2 Task filha-1/);
-    expect(b.texto).toMatch(/<b>Mensageria :: Ajustes<\/b>\n {3}↳ ⬜ \/t4 Task orfa/);
+    expect(linhas.findIndex((l) => l.includes('Novembro 2026'))).toBeLessThan(linhas.findIndex((l) => l.includes('<b>1.</b> ')));
+    expect(b.texto).toMatch(/<b>1\.<\/b> Task pai\n\s+<i>🔵 em progresso<\/i>/);
+    expect(b.texto).toMatch(/ {3}↳ <b>2\.<\/b> Task filha-1/);
+    expect(b.texto).toMatch(/<b>Mensageria :: Ajustes<\/b>\n {3}↳ <b>4\.<\/b> Task orfa/);
     expect(b.texto).toMatch(/Joga Junto<\/b>\n<i>Funifier PM · Suas tasks · 5 tasks<\/i>/);
   });
 

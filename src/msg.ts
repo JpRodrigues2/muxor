@@ -1,11 +1,13 @@
-// Padrão visual das mensagens do Telegram (B14). Toda mensagem do hub segue o mesmo esqueleto:
+// Padrão das mensagens do Telegram: título e descrição, sempre.
 //
-//   <ícone> <b>Título</b>          ← o assunto: a task, ou a pergunta que espera resposta
-//   <i>contexto · contexto</i>      ← a que se refere: app, ferramenta, estado
+//   <ícone> <b>Título</b>          ← o assunto, curto
+//   contexto · contexto             ← a descrição, em texto normal: fatos curtos separados por ·
+//   rodapé                          ← (opcional) o que fazer agora, numa frase
 //
-//   corpo                          ← texto normal; campos como "<b>Rótulo:</b> valor"
+//   corpo                          ← só quando precisa: listas, código, campos
 //
-//   <i>rodapé</i>                   ← o que fazer agora / observação
+// Exemplo:  📊 <b>Muxor online</b>
+//           hub-cloud · versão 9b493fb · broker ligado · nada rodando
 //
 // Um ícone só, no título, e sempre com o mesmo significado (ver ICONE). Nada de ícone decorativo.
 import { escapeHtml } from './resumo.js';
@@ -35,12 +37,13 @@ export const ICONE = {
 type Linha = string | null | undefined | false;
 
 export function cartao(o: { icone?: string; titulo: string; contexto?: Linha[]; corpo?: Linha[]; rodape?: Linha }): string {
-  const partes: string[] = [`${o.icone ? `${o.icone} ` : ''}<b>${o.titulo}</b>`];
+  const cabeca = [`${o.icone ? `${o.icone} ` : ''}<b>${o.titulo}</b>`];
   const ctx = (o.contexto ?? []).filter(Boolean) as string[];
-  if (ctx.length) partes[0] += `\n<i>${ctx.join(' · ')}</i>`;
+  if (ctx.length) cabeca.push(ctx.join(' · '));
+  if (o.rodape) cabeca.push(o.rodape);
+  const partes = [cabeca.join('\n')];
   const corpo = (o.corpo ?? []).filter((l) => l !== null && l !== undefined && l !== false) as string[];
   if (corpo.length) partes.push(corpo.join('\n').replace(/^\n+|\n+$/g, ''));
-  if (o.rodape) partes.push(`<i>${o.rodape}</i>`);
   return partes.join('\n\n');
 }
 

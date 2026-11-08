@@ -13,6 +13,7 @@ fica anotado, e o `muxor desinstalar` oferece remover só isso.
 | **Claude Code** | Quem faz as tasks | O `muxor init` (instalador oficial da Anthropic); depois ele abre o login no navegador | `claude --version` |
 | **Orca 1.4.246 ou mais novo** | Roda as sessões do Claude e mostra no celular | O `muxor init` (release oficial do GitHub, com a assinatura e a notarização da Apple conferidas) | Abre normalmente |
 | **Tailscale** | Abrir no celular o front-end que roda no Mac, só nos seus aparelhos | O `muxor init` (pede a senha do Mac: instala uma VPN) | Ícone na barra de menus |
+| **Amphetamine** | Manter o Mac acordado com a tampa fechada (o serviço do Muxor já impede o Mac de dormir com a tampa aberta) | O `muxor init`, pela App Store (grátis). Sem login na App Store, ele abre a página para você clicar em Obter | Ícone de pílula na barra de menus |
 | **ngrok** (opcional) | Link público do seu front, para mostrar a outra pessoa | O `muxor init`, se você quiser | `ngrok version` |
 
 **No celular** (o `muxor init` mostra um QR code para a página [muxor.com.br/celular](https://muxor.com.br/celular)):

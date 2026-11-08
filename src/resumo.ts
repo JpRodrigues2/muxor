@@ -76,8 +76,9 @@ export function appSugerido(t: Task, cat: Catalogo): string | null {
   return t.projetoId ? (appsDoProjeto(cat, t.ferramenta, t.projetoId)[0]?.app ?? null) : null;
 }
 
-// O número da task vira um comando clicável (/t3): tocar nele marca ✅ na própria linha (B20).
-export const marcador = (idx: number, marcada: boolean) => `${marcada ? '✅' : '⬜'} /t${idx} `;
+// O número da task na linha; a marcação é pelos botões com caixinha embaixo da mensagem. Em negrito: o título vem
+// escapado, então "<b>3.</b>" nunca aparece dentro dele (serve para achar a mensagem de cada task).
+export const marcador = (idx: number) => `<b>${idx}.</b> `;
 
 function linhaTask(i: ItemResumo, tz: string, filha: boolean) {
   const t = i.task;
@@ -85,7 +86,7 @@ function linhaTask(i: ItemResumo, tz: string, filha: boolean) {
   const link = t.link ? `<a href="${escapeHtml(t.link)}">${titulo}</a>` : titulo;
   const meta = [ETIQUETA[t.categoria], formatarPrazo(t.prazo, tz)].filter(Boolean).join(' · ');
   const recuo = filha ? '   ↳ ' : '';
-  return `${recuo}${marcador(i.idx, false)}${link}\n${filha ? '        ' : '     '}<i>${meta}</i>`;
+  return `${recuo}${marcador(i.idx)}${link}\n${filha ? '        ' : '     '}<i>${meta}</i>`;
 }
 
 // As tasks de um projeto na ordem e hierarquia da ferramenta: por sprint; cada pai seguido das subtarefas (na ordem

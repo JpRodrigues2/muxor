@@ -117,7 +117,7 @@ export class Regras {
       if (i && i % 2 === 0) kb.row();
       kb.text(`📄 ${f.titulo}`, `g:${f.nome}:ver`);
     });
-    await this.api.sendMessage(this.chatId, cartao({ icone: ICONE.regras, titulo: 'Regras de trabalho', rodape: 'Vão em todo prompt do espaço (ou do projeto). Qual quer ver?' }), {
+    await this.api.sendMessage(this.chatId, cartao({ icone: ICONE.regras, titulo: 'Regras de trabalho', rodape: 'Vão em todo pedido ao Claude. Qual quer ver?' }), {
       ...HTML,
       reply_markup: kb,
     });

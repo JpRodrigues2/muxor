@@ -119,11 +119,17 @@ export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
     else ctx.definirEnv({ BNEXO_MCP_URL: null, BNEXO_MCP_TOKEN: null });
   }
   if (escolhidas.includes('jira')) {
-    tela.info('Jira: abri a página do token no navegador. Clique em Create API token, dê o nome Muxor e copie o token.');
-    await tela.link('https://id.atlassian.com/manage-profile/security/api-tokens', 'API token do Jira', { abrir: true });
+    tela.nota(
+      [
+        '1. Abra o seu Jira no navegador e copie o endereço da barra.',
+        '2. Na página que abri, clique em Create API token, dê o nome Muxor e copie o token.',
+      ].join('\n'),
+      'Jira',
+    );
+    await rodar('open', ['https://id.atlassian.com/manage-profile/security/api-tokens']);
     const conectou = await tentar('Jira', async () => {
       ctx.definirEnv({
-        JIRA_URL: enderecoJira(await tela.texto('Nome do seu Jira, o que vem antes de .atlassian.net', { validar: (v) => (enderecoJira(v) ? undefined : 'Só o nome, ex.: minhaempresa') })),
+        JIRA_URL: enderecoJira(await tela.texto('Endereço do seu Jira. Cole o que está na barra do navegador', { validar: (v) => (enderecoJira(v) ? undefined : 'Cole o endereço do Jira, ex.: minhaempresa.atlassian.net') })),
         JIRA_EMAIL: await tela.texto('E-mail da conta Atlassian', { validar: (v) => (/^\S+@\S+$/.test(v) ? undefined : 'Digite o e-mail.') }),
         JIRA_API_TOKEN: await tela.segredo('API token do Jira'),
       });

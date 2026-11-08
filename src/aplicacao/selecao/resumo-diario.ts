@@ -1,9 +1,9 @@
 // Caso de uso: resumo com seleção. Lista as tasks das ferramentas de gestão (um projeto por mensagem, com a hierarquia
-// da ferramenta, B20); o usuário marca tocando no número da task (/t3) e inicia.
+// da ferramenta, B20); embaixo de cada mensagem, um botão com caixinha por task (⬜/✅) para marcar, e no fim Iniciar.
 //
-// /t<idx>        alterna ⬜/✅ da task na própria linha (edita a mensagem)
-// callback_data  t:<resumo>:<idx>         idem, pelos botões das mensagens antigas
+// callback_data  t:<resumo>:<idx>         alterna ⬜/✅ da task (redesenha os botões da mensagem)
 //                r:<resumo>:go|lote|none  "Iniciar selecionadas" / "Iniciar em lote" / "Nenhuma hoje"
+// /t<idx>        o mesmo que o botão da task (atalho antigo)
 //
 // Lote: as tasks marcadas vão juntas, num só prompt e numa só sessão (a 1ª é a líder).
 import { log, errInfo } from '../../logger.js';
@@ -14,6 +14,13 @@ import { dividirMensagem, marcador, montarResumo } from '../../resumo.js';
 import type { Teclado } from '../portas.js';
 import type { DepsSelecao } from './contexto.js';
 import type { ConfigurarSelecao } from './configurar.js';
+
+// Uma linha por task, com a caixinha; os botões de iniciar vão só na última mensagem com tasks.
+function tecladoItens(resumoId: number, itens: { idx: number; titulo: string; selecionada: boolean }[], final: boolean): Teclado | undefined {
+  const linhas: Teclado = itens.map((i) => [{ texto: `${i.selecionada ? '✅' : '⬜'} ${i.idx}. ${i.titulo.length > 40 ? i.titulo.slice(0, 39) + '…' : i.titulo}`, dado: `t:${resumoId}:${i.idx}` }]);
+  if (final) linhas.push(...tecladoFinal(resumoId));
+  return linhas.length ? linhas : undefined;
+}
 
 function tecladoFinal(resumoId: number): Teclado {
   return [
@@ -74,18 +81,23 @@ export class ResumoDiario {
       for (const [bi, bloco] of blocos.entries()) {
         const final = bi === ultimoComBotoes;
         const extras = [
-          final ? 'Toque no número da task (/t1, /t2…) para marcar ✅, depois em ▶️ Iniciar. Se elas se complementam, 📦 Em lote manda todas juntas para uma sessão.' : null,
+          final ? 'Marque nas caixinhas e toque em Iniciar. Em lote manda as marcadas juntas, numa sessão só.' : null,
           ...(bi === blocos.length - 1 ? rodapes : []),
         ].filter(Boolean);
-        const partes = dividirMensagem(extras.length ? `${bloco.texto}\n\n<i>${extras.join('\n')}</i>` : bloco.texto);
+        const partes = dividirMensagem(extras.length ? `${bloco.texto}\n\n${extras.join('\n')}` : bloco.texto);
         let msgId: number | null = null;
         const msgDoItem = new Map<number, number>();
         for (let p = 0; p < partes.length; p++) {
           const ultima = p === partes.length - 1;
-          const id = await notificador.enviar(partes[p], ultima && final ? tecladoFinal(resumoId) : undefined);
+          const daParte = bloco.itens.filter((i) => partes[p].includes(marcador(i.idx)));
+          const teclado = tecladoItens(
+            resumoId,
+            daParte.map((i) => ({ idx: i.idx, titulo: i.task.titulo, selecionada: false })),
+            ultima && final,
+          );
+          const id = await notificador.enviar(partes[p], teclado);
           if (id === null) throw new Error('o Telegram não aceitou o resumo');
-          if (bloco.itens.some((i) => partes[p].includes(marcador(i.idx, false)))) resumos.guardarTexto(resumoId, id, partes[p]);
-          for (const i of bloco.itens) if (partes[p].includes(marcador(i.idx, false))) msgDoItem.set(i.idx, id);
+          for (const i of daParte) msgDoItem.set(i.idx, id);
           if (ultima) msgId = id;
         }
         for (const i of bloco.itens)
@@ -107,18 +119,13 @@ export class ResumoDiario {
     }
   }
 
-  // Marca/desmarca e redesenha a linha da task (✅/⬜). Retorna o texto para a resposta.
+  // Marca/desmarca e redesenha os botões da mensagem da task (⬜/✅). Retorna o texto para a resposta.
   async alternarItem(resumoId: number, idx: number): Promise<string> {
     const { resumos, notificador } = this.d;
-    if (!resumos.aberto(resumoId)) return 'Esse resumo já foi fechado. Use /tarefas para um novo.';
+    if (!resumos.aberto(resumoId)) return 'Essa lista já foi fechada. Use /tarefas para uma nova.';
     const r = resumos.alternar(resumoId, idx);
-    if (!r) return `Não há task ${idx} neste resumo.`;
-    const texto = resumos.texto(r.msgId);
-    if (texto) {
-      const novo = texto.replace(marcador(idx, !r.marcada), marcador(idx, r.marcada));
-      resumos.guardarTexto(resumoId, r.msgId, novo);
-      await notificador.editar(r.msgId, novo, resumos.msgBotoes(resumoId) === r.msgId ? tecladoFinal(resumoId) : undefined);
-    }
+    if (!r) return `Não há task ${idx} nesta lista.`;
+    await notificador.botoes(r.msgId, tecladoItens(resumoId, r.itens, resumos.msgBotoes(resumoId) === r.msgId));
     return r.marcada ? `Task ${idx} marcada` : `Task ${idx} desmarcada`;
   }
 

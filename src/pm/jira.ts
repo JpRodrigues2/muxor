@@ -50,13 +50,18 @@ export class JiraAdapter implements PmAdapter {
   }
 
   private async api<T>(caminho: string, init: RequestInit = {}): Promise<T> {
+    const site = this.base.replace(/^https?:\/\//, '');
     const r = await this.buscar(`${this.base}/rest/api/3${caminho}`, {
       ...init,
       headers: { Authorization: this.auth, Accept: 'application/json', 'Content-Type': 'application/json', ...(init.headers ?? {}) },
       signal: AbortSignal.timeout(30_000),
+    }).catch((e: Error) => {
+      // Endereço que não existe (DNS) ou rede fora: a mensagem do fetch ("fetch failed") não diz nada.
+      throw new Error(e.name === 'TimeoutError' ? `o Jira em ${site} não respondeu` : `não achei o Jira em ${site}. Confira o endereço`);
     });
-    if (r.status === 401 || r.status === 403) throw new Error('Jira: e-mail ou API token recusado');
-    if (!r.ok) throw new Error(`Jira: ${r.status} em ${caminho.split('?')[0]}`);
+    if (r.status === 401 || r.status === 403) throw new Error('o e-mail ou o API token não foram aceitos. Confira os dois');
+    if (r.status === 404 && caminho === '/myself') throw new Error(`não achei o Jira em ${site}. Confira o endereço`);
+    if (!r.ok) throw new Error(`o Jira respondeu ${r.status} em ${caminho.split('?')[0]}`);
     return (r.status === 204 ? undefined : await r.json()) as T;
   }
 

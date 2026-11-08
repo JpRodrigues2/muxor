@@ -10,6 +10,8 @@ export const plistDoServico = () => join(homedir(), 'Library', 'LaunchAgents', `
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+// O Muxor roda dentro do caffeinate (vem no macOS): enquanto ele está ligado, o Mac não dorme por inatividade, e
+// as tasks continuam com a tela apagada. Com a tampa fechada, quem segura é o Amphetamine (passo 1).
 export function conteudoPlist(o: { node: string; repo: string; ambiente: Record<string, string>; log: string }) {
   const env = Object.entries(o.ambiente)
     .map(([k, v]) => `    <key>${esc(k)}</key><string>${esc(v)}</string>`)
@@ -21,6 +23,8 @@ export function conteudoPlist(o: { node: string; repo: string; ambiente: Record<
   <key>Label</key><string>${ROTULO}</string>
   <key>ProgramArguments</key>
   <array>
+    <string>/usr/bin/caffeinate</string>
+    <string>-is</string>
     <string>${esc(o.node)}</string>
     <string>${esc(join(o.repo, 'node_modules', 'tsx', 'dist', 'cli.mjs'))}</string>
     <string>${esc(join(o.repo, 'src', 'main.ts'))}</string>
