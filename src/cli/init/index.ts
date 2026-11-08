@@ -21,7 +21,7 @@ const PASSOS: Passo[] = [
   { id: 'espacos', titulo: 'Espaços e contas do GitHub', rodar: (c) => passos.espacos(c) },
   { id: 'existentes', titulo: 'Projetos que você já tem no Orca', rodar: (c) => passos.existentes(c) },
   { id: 'repositorios', titulo: 'Baixar repositórios (opcional)', rodar: (c) => passos.repositorios(c) },
-  { id: 'depara', titulo: 'Projetos → pastas', rodar: (c) => passos.dePara(c) },
+  { id: 'depara', titulo: 'Ligar projetos às pastas', rodar: (c) => passos.dePara(c) },
   { id: 'telegram', titulo: 'Bot do Telegram', rodar: (c) => passos.telegram(c) },
   { id: 'orca', titulo: 'Orca e celular', rodar: () => passos.orca() },
   { id: 'front', titulo: 'Front-end no celular', rodar: (c) => preparar.front(c) },
@@ -54,7 +54,8 @@ export async function init(casa: Casa, refazer?: string) {
   const feitos = PASSOS.filter(feito).length;
   if (feitos && !refazer) {
     tela.info(`Continuando de onde parou: ${feitos} de ${PASSOS.length} passos já feitos.`);
-    const proximo = PASSOS.findIndex((p) => !feito(p));
+    // O próximo de verdade: o passo 1 (pré-requisitos) roda sempre e nunca fica "feito", não conta.
+    const proximo = PASSOS.findIndex((p) => !p.sempre && !feito(p));
     try {
       const escolha = await tela.escolher(
         'Como quer seguir?',
@@ -68,8 +69,12 @@ export async function init(casa: Casa, refazer?: string) {
       if (escolha === 'voltar') {
         const id = await tela.escolher(
           'Refazer a partir de qual passo?',
-          PASSOS.slice(0, proximo < 0 ? PASSOS.length : proximo + 1).map((p, n) => ({ valor: p.id, rotulo: `${n + 1} · ${p.titulo}`, dica: feito(p) ? 'feito' : undefined })),
-          undefined,
+          // O passo 1 (pré-requisitos) roda sempre: não entra na lista. O cursor começa no último feito.
+          PASSOS.slice(0, proximo < 0 ? PASSOS.length : proximo + 1)
+            .map((p, n) => ({ p, n }))
+            .filter(({ p }) => !p.sempre)
+            .map(({ p, n }) => ({ valor: p.id, rotulo: `${n + 1} · ${p.titulo}`, dica: feito(p) ? 'feito' : 'o próximo' })),
+          (proximo > 0 ? PASSOS[proximo - 1] : PASSOS[PASSOS.length - 1]).id,
           { semVoltar: true },
         );
         i = PASSOS.findIndex((p) => p.id === id);
@@ -84,11 +89,12 @@ export async function init(casa: Casa, refazer?: string) {
     while (i < PASSOS.length) {
       const p = PASSOS[i];
       if (feito(p)) {
-        tela.ok(`Passo ${i + 1} de ${PASSOS.length} · ${p.titulo}: já feito`);
-        i++;
+        i++; // já feito (o resumo apareceu no começo)
         continue;
       }
-      tela.passo(i + 1, PASSOS.length, p.titulo, PASSOS.slice(0, i).some((x) => !x.sempre));
+      // Retomando, o passo 1 é só a conferência rápida dos programas: não parece que recomeçou do zero.
+      if (p.sempre && feitos) tela.info('Conferindo os programas antes de continuar…');
+      else tela.passo(i + 1, PASSOS.length, p.titulo, PASSOS.slice(0, i).some((x) => !x.sempre));
       const anterior = PASSOS.slice(0, i).findLastIndex((x) => !x.sempre);
       tela.botaoVoltar = anterior >= 0; // no primeiro passo não há para onde voltar
       try {

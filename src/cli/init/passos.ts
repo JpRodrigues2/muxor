@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { homedir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
-import { adicionarApp, ligarProjeto, loadCatalogo, nomeEspaco, salvarEspaco, type App } from '../../config.js';
+import { adicionarApp, appsDoProjeto, desligarProjeto, ligarProjeto, loadCatalogo, nomeEspaco, salvarEspaco, type App } from '../../config.js';
 import { NOME_FERRAMENTA } from '../../dominio/selecao.js';
 import { BnexoAdapter } from '../../pm/bnexo.js';
 import { FunifierPmAdapter } from '../../pm/funifier-pm.js';
@@ -404,56 +404,94 @@ export async function dePara(ctx: Ctx) {
   }
 }
 
-async function ligarProjetos(ctx: Ctx, pms: PmAdapter[]) {
-  tela.info('Agora ligo cada projeto das suas ferramentas a uma pasta. Mostro os projetos em que você tem tasks abertas; os outros eu pergunto pelo Telegram quando chegar uma task deles.');
+interface ProjetoDaFerramenta {
+  ferramenta: Ferramenta;
+  nomeFer: string;
+  projetoId: string;
+  nome: string;
+  exemplo: string;
+  n: number;
+}
+
+export async function ligarProjetos(ctx: Ctx, pms: PmAdapter[]) {
+  tela.nota(
+    [
+      'Cada projeto da ferramenta de gestão roda numa pasta do seu Mac (a do código dele).',
+      'Para cada um, escolha a pasta. Não sabe ainda? "Decidir depois": o Telegram pergunta quando chegar uma task.',
+    ].join('\n'),
+    'Ligar projetos às pastas',
+  );
+  const projetos: ProjetoDaFerramenta[] = [];
   for (const pm of pms) {
     const nomeFer = NOME_FERRAMENTA[pm.nome] ?? pm.nome;
     const tasks = await tela.esperando(`Buscando suas tasks no ${nomeFer}…`, () => pm.listMyTasks(), (t) => `${nomeFer}: ${t.length} task(s) abertas`);
-    const projetos = new Map<string, { nome: string; exemplo: string; n: number }>();
+    const porId = new Map<string, ProjetoDaFerramenta>();
     for (const t of tasks) {
       if (!t.projetoId) continue;
-      const p = projetos.get(t.projetoId) ?? { nome: t.projetoNome ?? `projeto ${t.projetoId.slice(0, 8)}`, exemplo: t.titulo, n: 0 };
+      const p = porId.get(t.projetoId) ?? { ferramenta: pm.nome as Ferramenta, nomeFer, projetoId: t.projetoId, nome: t.projetoNome ?? `projeto ${t.projetoId.slice(0, 8)}`, exemplo: t.titulo, n: 0 };
       p.n++;
-      projetos.set(t.projetoId, p);
+      porId.set(t.projetoId, p);
     }
-    for (const [projetoId, p] of projetos) {
-      const cat = loadCatalogo();
-      if (cat.apps.some((a) => a.ferramenta === pm.nome && a.projetos_na_ferramenta.includes(projetoId))) continue;
-      // Os projetos que já estão no Muxor (trazidos do Orca ou de antes) e as pastas dos espaços que ainda não estão.
-      const jaNoHub = cat.apps.filter((a) => a.ferramenta === pm.nome || a.ferramenta === 'nenhuma');
-      const pastasHub = new Set(cat.apps.map((a) => a.pasta));
-      const opcoes = [
-        ...jaNoHub.map((a) => ({ valor: `app|${a.app}`, rotulo: `${a.app} (já no Muxor)`, dica: a.pasta })),
-        ...cat.espacos.flatMap((e) => subpastas(e.pasta).filter((n) => !pastasHub.has(join(e.pasta, n))).map((n) => ({ valor: `${e.id}|${n}`, rotulo: `${nomeEspaco(e)} / ${n}` }))),
-      ];
-      const escolha = await tela.escolher(`${nomeFer} · "${p.nome}" (${p.n} task(s), ex.: ${p.exemplo.slice(0, 50)}): em qual pasta roda?`, [
-        ...opcoes,
-        { valor: 'nova', rotulo: 'Criar uma pasta nova (sem repositório)' },
-        { valor: 'depois', rotulo: 'Depois, pelo Telegram' },
-      ]);
-      if (escolha === 'depois') continue;
-      if (escolha.startsWith('app|')) {
-        const app = escolha.slice(4);
-        ligarProjeto(app, projetoId, pm.nome as Ferramenta);
-        tela.ok(`"${p.nome}" → ${app}`);
-        continue;
-      }
-      let [espaco, pasta] = escolha.split('|');
-      if (escolha === 'nova') {
-        espaco = cat.espacos.length === 1 ? cat.espacos[0].id : await tela.escolher('Em qual espaço?', cat.espacos.map((e) => ({ valor: e.id, rotulo: nomeEspaco(e) })));
-        pasta = slug(await tela.texto('Nome da pasta', { padrao: slug(p.nome), validar: (v) => (slug(v) ? undefined : 'Use letras ou números.') }));
-        const caminho = join(cat.espacos.find((e) => e.id === espaco)!.pasta, pasta);
-        if (!existsSync(caminho)) {
-          mkdirSync(caminho, { recursive: true });
-          ctx.registrar({ tipo: 'pasta', caminho });
-        }
-        // O Orca só aceita pastas com git: um git só local, sem remoto.
-        if (!existsSync(join(caminho, '.git'))) await rodar('git', ['-C', caminho, 'init', '-q']);
-      }
-      ligar(cat.apps, { espaco, pasta, ferramenta: pm.nome as Ferramenta, projetoId });
-      tela.ok(`"${p.nome}" → ${pasta}`);
-    }
+    projetos.push(...porId.values());
   }
+  if (!projetos.length) return tela.info('Nenhuma task aberta nas suas ferramentas: você liga os projetos pelo Telegram quando chegar a primeira task.');
+
+  for (const p of projetos) await perguntarPasta(ctx, p);
+  // Antes de seguir, o resumo: um Enter sem querer não passa do passo sem você ver como ficou.
+  for (;;) {
+    const cat = loadCatalogo();
+    const destino = (p: ProjetoDaFerramenta) => appsDoProjeto(cat, p.ferramenta, p.projetoId)[0];
+    tela.nota(projetos.map((p) => `${p.nomeFer} · ${p.nome}  →  ${destino(p) ? `${destino(p).app} (${destino(p).pasta})` : 'decidir depois'}`).join('\n'), 'Como ficou');
+    const escolha = await tela.escolher('Está certo?', [
+      { valor: 'ok', rotulo: 'Sim, seguir para o próximo passo' },
+      ...projetos.map((p, i) => ({ valor: String(i), rotulo: `Mudar: ${p.nomeFer} · ${p.nome}` })),
+    ]);
+    if (escolha === 'ok') return;
+    await perguntarPasta(ctx, projetos[Number(escolha)]);
+  }
+}
+
+async function perguntarPasta(ctx: Ctx, p: ProjetoDaFerramenta) {
+  const cat = loadCatalogo();
+  const atual = appsDoProjeto(cat, p.ferramenta, p.projetoId)[0];
+  const pastasHub = new Set(cat.apps.map((a) => a.pasta));
+  const opcoes = [
+    ...cat.apps
+      .filter((a) => a === atual || a.ferramenta === p.ferramenta || a.ferramenta === 'nenhuma')
+      .map((a) => ({ valor: `app|${a.app}`, rotulo: a === atual ? `${a.app} (ligado agora)` : a.app, dica: a.pasta })),
+    ...cat.espacos.flatMap((e) =>
+      subpastas(e.pasta)
+        .filter((n) => !pastasHub.has(join(e.pasta, n)))
+        .map((n) => ({ valor: `${e.id}|${n}`, rotulo: `${nomeEspaco(e)} / ${n}`, dica: 'pasta nova no Muxor' })),
+    ),
+    { valor: 'nova', rotulo: 'Criar uma pasta nova (sem repositório)' },
+    { valor: 'depois', rotulo: 'Decidir depois (pelo Telegram)' },
+  ];
+  const escolha = await tela.escolher(
+    `${p.nomeFer} · "${p.nome}" (${p.n} task${p.n > 1 ? 's' : ''}, ex.: ${p.exemplo.slice(0, 40)}): qual pasta?`,
+    opcoes,
+    atual ? `app|${atual.app}` : 'depois', // o cursor começa no que já vale (ou em "depois"): Enter sem querer não liga nada errado
+  );
+  if (escolha === (atual ? `app|${atual.app}` : '')) return;
+  desligarProjeto(p.ferramenta, p.projetoId);
+  if (escolha === 'depois') return;
+  if (escolha.startsWith('app|')) {
+    ligarProjeto(escolha.slice(4), p.projetoId, p.ferramenta);
+    return;
+  }
+  let [espaco, pasta] = escolha.split('|');
+  if (escolha === 'nova') {
+    espaco = cat.espacos.length === 1 ? cat.espacos[0].id : await tela.escolher('Em qual espaço?', cat.espacos.map((e) => ({ valor: e.id, rotulo: nomeEspaco(e) })));
+    pasta = slug(await tela.texto('Nome da pasta', { padrao: slug(p.nome), validar: (v) => (slug(v) ? undefined : 'Use letras ou números.') }));
+    const caminho = join(cat.espacos.find((e) => e.id === espaco)!.pasta, pasta);
+    if (!existsSync(caminho)) {
+      mkdirSync(caminho, { recursive: true });
+      ctx.registrar({ tipo: 'pasta', caminho });
+    }
+    // O Orca só aceita pastas com git: um git só local, sem remoto.
+    if (!existsSync(join(caminho, '.git'))) await rodar('git', ['-C', caminho, 'init', '-q']);
+  }
+  ligar(loadCatalogo().apps, { espaco, pasta, ferramenta: p.ferramenta, projetoId: p.projetoId });
 }
 
 function ligar(apps: App[], o: { espaco: string; pasta: string; ferramenta: Ferramenta; projetoId: string }) {
@@ -478,7 +516,7 @@ export async function telegram(ctx: Ctx) {
     ].join('\n'),
     'Telegram',
   );
-  await tela.link('https://t.me/BotFather', 'BotFather (abra no celular pelo QR, ou no Mac)', { qr: true, abrir: true });
+  await tela.link('https://t.me/BotFather', 'BotFather (abra no celular pelo QR, ou clique no link)', { qr: true });
   let bot: { usuario: string } | null = null;
   let token = '';
   while (!bot) {

@@ -277,6 +277,18 @@ export function ligarProjeto(app: string, projeto: string, ferramenta?: App['fer
   });
 }
 
+// Tira o projeto da ferramenta de todas as pastas (para religar em outra, ou deixar para decidir depois).
+export function desligarProjeto(ferramenta: App['ferramenta'], projeto: string) {
+  if (!appsDoProjeto(loadCatalogo(), ferramenta, projeto).length) return;
+  editarCatalogo((doc) => {
+    const apps = doc.toJS().apps as { ferramenta?: string; projetos_na_ferramenta?: string[] }[];
+    apps.forEach((a, i) => {
+      const j = a.ferramenta === ferramenta ? (a.projetos_na_ferramenta ?? []).indexOf(projeto) : -1;
+      if (j >= 0) doc.deleteIn(['apps', i, 'projetos_na_ferramenta', j]);
+    });
+  });
+}
+
 export function adicionarGamificacao(app: string, g: Gamificacao) {
   editarCatalogo((doc) => {
     const i = indiceApp(doc, app);

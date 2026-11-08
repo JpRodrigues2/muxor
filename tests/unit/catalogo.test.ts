@@ -8,7 +8,7 @@ const raiz = mkdtempSync(join(tmpdir(), 'hub-catalogo-'));
 process.env.HUB_DADOS_DIR = join(raiz, 'dados');
 process.env.HUB_APPS_FILE = join(raiz, 'apps.yaml');
 process.env.HUB_REPOS_DIR = join(raiz, 'repos');
-const { ligarProjeto, loadCatalogo, migrarCatalogo } = await import('../../src/config.js');
+const { desligarProjeto, ligarProjeto, loadCatalogo, migrarCatalogo } = await import('../../src/config.js');
 const { fontesDeRegras } = await import('../../src/regras.js');
 
 const APPS = process.env.HUB_APPS_FILE;
@@ -91,6 +91,20 @@ apps:
     expect(loadCatalogo().apps[0]).toMatchObject({ ferramenta: 'jira', projetos_na_ferramenta: ['LAB'] });
     ligarProjeto('lab', 'OUTRO', 'bnexo'); // já tem ferramenta: só acrescenta o projeto
     expect(loadCatalogo().apps[0]).toMatchObject({ ferramenta: 'jira', projetos_na_ferramenta: ['LAB', 'OUTRO'] });
+  });
+
+  it('desligar tira o projeto da pasta (para religar em outra) e não mexe nos outros', () => {
+    writeFileSync(
+      APPS,
+      'espacos:\n  - { id: pessoal, pasta: /tmp/p }\napps:\n  - { app: a, espaco: pessoal, ferramenta: jira, pasta: /tmp/a, projetos_na_ferramenta: [X, Y] }\n  - { app: b, espaco: pessoal, ferramenta: jira, pasta: /tmp/b }\n',
+    );
+    desligarProjeto('jira', 'X');
+    ligarProjeto('b', 'X', 'jira');
+    const [a, b] = loadCatalogo().apps;
+    expect(a.projetos_na_ferramenta).toEqual(['Y']);
+    expect(b.projetos_na_ferramenta).toEqual(['X']);
+    desligarProjeto('jira', 'NAO-EXISTE'); // sem efeito
+    expect(loadCatalogo().apps[0].projetos_na_ferramenta).toEqual(['Y']);
   });
 
   it('app com espaço que não existe: erro claro', () => {
