@@ -17,6 +17,7 @@ import { criarSelecao } from './aplicacao/selecao/index.js';
 import { Broker, autorizadasDoBanco } from './broker/broker.js';
 import { CAMINHOS, ROOT } from './caminhos.js';
 import { adicionarApp, ligarProjeto, loadCatalogo, loadEnv, migrarCatalogo, type Env } from './config.js';
+import { tolerarConexaoOciosa } from './conexao-ociosa.js';
 import { openDb } from './db.js';
 import { gitProjetos } from './git.js';
 import { INTERVALO_HEARTBEAT_MS, baterCoracao } from './heartbeat.js';
@@ -138,6 +139,7 @@ async function parar(sinal: string) {
 process.once('SIGINT', () => void parar('SIGINT'));
 process.once('SIGTERM', () => void parar('SIGTERM'));
 process.on('unhandledRejection', (e) => log.error('hub: promise rejeitada', errInfo(e)));
+tolerarConexaoOciosa((e) => log.warn('hub: conexão ociosa encerrada pelo servidor', errInfo(e)));
 
 log.info('hub: iniciando bot (long polling)', { escritaPm: env.HUB_ESCRITA_PM, cofre: env.HUB_COFRE, broker: env.HUB_BROKER, dados: CAMINHOS.dados });
 await bot.start({

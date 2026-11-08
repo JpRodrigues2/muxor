@@ -38,6 +38,7 @@ export interface PmAdapter {
   setStatus(id: string, status: StatusHub): Promise<void>;
   comment(id: string, texto: string): Promise<void>;
   ping(): Promise<string>; // descrição curta de quem está logado
+  fechar?(): Promise<void>; // fecha a conexão (MCP), quando há uma aberta
 }
 
 export class EscritaBloqueadaError extends Error {

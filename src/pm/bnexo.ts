@@ -41,6 +41,11 @@ const STATUS: Record<StatusHub, string> = { em_progresso: 'in_progress', em_revi
 
 export class BnexoAdapter implements PmAdapter {
   readonly nome = 'bnexo' as const;
+  // Fecha a conexão MCP (o init usa o adaptador só para conferir o login).
+  async fechar() {
+    await this.mcp.close();
+  }
+
   private mcp = new McpConexao('bnexo');
   // project_id não vem na listagem: cache id da task → project_id (não muda na prática).
   private projetoDaTask = new Map<string, string | null>();

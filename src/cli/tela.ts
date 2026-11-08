@@ -7,8 +7,8 @@ import qrcode from 'qrcode-terminal';
 import { abertura } from './arte.js';
 
 // Textos da biblioteca em português (as instruções são listas exportadas por ela).
-p.SELECT_INSTRUCTIONS.splice(0, p.SELECT_INSTRUCTIONS.length, '↑/↓ para mover', 'Enter: confirma');
-p.MULTISELECT_INSTRUCTIONS.splice(0, p.MULTISELECT_INSTRUCTIONS.length, '↑/↓ para mover', 'Espaço: marca', 'Enter: confirma');
+p.SELECT_INSTRUCTIONS.splice(0, p.SELECT_INSTRUCTIONS.length, '↑/↓ para mover', 'Enter: confirma', 'Esc: voltar');
+p.MULTISELECT_INSTRUCTIONS.splice(0, p.MULTISELECT_INSTRUCTIONS.length, '↑/↓ para mover', 'Espaço: marca', 'Enter: confirma', 'Esc: voltar');
 p.updateSettings({ messages: { cancel: 'Cancelado', error: 'Algo deu errado' } });
 
 // Ctrl+C ou Esc em qualquer pergunta: para sem estragar nada; o progresso fica salvo.

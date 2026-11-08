@@ -149,6 +149,7 @@ export async function connect(name: PmName, { interactive = true } = {}): Promis
     if (!interactive) throw new PmLoginRequiredError(name);
     const code = await waitForAuthCode();
     await transport.finishAuth(code);
+    await client.close().catch(() => {}); // a primeira tentativa (sem login) não pode ficar aberta
     const retry = new Client({ name: 'hub', version: '0.1.0' });
     await retry.connect(new StreamableHTTPClientTransport(url, { authProvider }));
     return retry;

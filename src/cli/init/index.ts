@@ -38,26 +38,78 @@ export async function init(casa: Casa, refazer?: string) {
     }
     for (const p of PASSOS.slice(PASSOS.findIndex((p) => p.id === refazer))) delete estado.passos[p.id];
   }
+  const sair = () => {
+    tela.fim('Parei aqui. Rode `muxor init` de novo para continuar de onde parou (ou voltar a um passo).');
+    return 1;
+  };
   const ctx = criarCtx(casa, estado);
   tela.abertura('Muxor · configuração');
-  const feitos = PASSOS.filter((p) => estado.passos[p.id] && !p.sempre).length;
-  if (feitos) tela.info(`Continuando de onde parou: ${feitos} de ${PASSOS.length} passos já feitos. (Para refazer um passo: muxor init --refazer <passo>)`);
+  const feito = (p: Passo) => !!estado.passos[p.id] && !p.sempre;
+  const esquecer = (de: number) => {
+    for (const p of PASSOS.slice(de)) delete estado.passos[p.id];
+    ctx.salvar();
+  };
+  let i = 0;
+  const feitos = PASSOS.filter(feito).length;
+  if (feitos && !refazer) {
+    tela.info(`Continuando de onde parou: ${feitos} de ${PASSOS.length} passos já feitos.`);
+    const proximo = PASSOS.findIndex((p) => !feito(p));
+    try {
+      const escolha = await tela.escolher('Como quer seguir?', [
+        { valor: 'seguir', rotulo: proximo < 0 ? 'Conferir tudo de novo' : `Seguir: passo ${proximo + 1} · ${PASSOS[proximo].titulo}` },
+        { valor: 'voltar', rotulo: 'Voltar a um passo anterior e refazer dali' },
+      ]);
+      if (escolha === 'voltar') {
+        const id = await tela.escolher(
+          'Refazer a partir de qual passo?',
+          PASSOS.slice(0, proximo < 0 ? PASSOS.length : proximo + 1).map((p, n) => ({ valor: p.id, rotulo: `${n + 1} · ${p.titulo}`, dica: feito(p) ? 'feito' : undefined })),
+        );
+        i = PASSOS.findIndex((p) => p.id === id);
+        esquecer(i);
+      }
+    } catch (e) {
+      if (e instanceof Parou) return sair();
+      throw e;
+    }
+  }
   try {
-    for (const [i, p] of PASSOS.entries()) {
-      if (estado.passos[p.id] && !p.sempre) {
+    while (i < PASSOS.length) {
+      const p = PASSOS[i];
+      if (feito(p)) {
         tela.ok(`Passo ${i + 1} de ${PASSOS.length} · ${p.titulo}: já feito`);
+        i++;
         continue;
       }
       tela.passo(i + 1, PASSOS.length, p.titulo);
-      await p.rodar(ctx);
+      try {
+        await p.rodar(ctx);
+      } catch (e) {
+        if (!(e instanceof Parou)) throw e;
+        // Esc numa pergunta: voltar um passo, refazer este ou sair (o que já foi feito fica salvo).
+        const anterior = PASSOS.slice(0, i).findLastIndex((x) => !x.sempre);
+        const escolha = await tela
+          .escolher('Pausado. O que quer fazer?', [
+            ...(anterior >= 0 ? [{ valor: 'voltar', rotulo: `Voltar ao passo ${anterior + 1} · ${PASSOS[anterior].titulo}` }] : []),
+            { valor: 'refazer', rotulo: `Refazer este passo (${p.titulo})` },
+            { valor: 'sair', rotulo: 'Sair e continuar depois (muxor init)' },
+          ])
+          .catch((x) => {
+            if (x instanceof Parou) return 'sair';
+            throw x;
+          });
+        if (escolha === 'sair') throw e;
+        if (escolha === 'voltar') {
+          i = anterior;
+          esquecer(i);
+        }
+        continue;
+      }
       estado.passos[p.id] = new Date().toISOString();
       ctx.salvar();
+      i++;
     }
   } catch (e) {
-    if (e instanceof Parou) {
-      tela.fim('Parei aqui. Rode `muxor init` de novo para continuar de onde parou.');
-      return 1;
-    }
+    if (e instanceof Parou) return sair();
     if (e instanceof passos.Interrompido) {
       tela.fim('Rode `muxor init` de novo quando resolver: eu continuo deste passo.');
       return 1;

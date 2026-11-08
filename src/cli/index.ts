@@ -5,6 +5,9 @@ import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import { casaDoHub } from './casa.js';
 import { rodar, variaveisDoServico, type Modo } from './diagnostico.js';
+import { tolerarConexaoOciosa } from '../conexao-ociosa.js';
+
+tolerarConexaoOciosa(() => {}); // a conexão parada caiu: quem usa reconecta; a configuração segue
 
 const AJUDA = `Uso: muxor <comando>
 

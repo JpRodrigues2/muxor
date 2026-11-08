@@ -54,6 +54,8 @@ Na primeira task de cada projeto, o Claude pergunta se confia na pasta: o Muxor 
   durma com a tampa aberta e carregador ligado.
 - **O Orca precisa estar aberto.**
 - Para conferir tudo a qualquer momento: `muxor diagnostico`.
+- **Errou uma resposta?** Aperte **Esc** em qualquer pergunta: dá para voltar ao passo anterior, refazer o passo ou sair
+  (o que já foi feito fica salvo). Rodando `muxor init` de novo, ele pergunta se você quer seguir ou voltar a um passo.
 
 ## Comandos do terminal
 
@@ -61,7 +63,7 @@ De qualquer pasta (quem baixou com `git clone` usa `./muxor`, de dentro da pasta
 
 | Comando | O que faz |
 |---|---|
-| `muxor init` | Configura (ou continua a configuração) |
+| `muxor init` | Configura (ou continua a configuração; dá para voltar a um passo anterior) |
 | `muxor init --refazer <passo>` | Refaz a partir de um passo: `ferramentas`, `espacos`, `existentes`, `repositorios`, `depara`, `telegram`, `orca`, `front`, `servico`, `teste` |
 | `muxor diagnostico` | Confere cada peça e diz o próximo passo de cada problema |
 | `muxor adicionar github-workspace` | Mais um espaço (outra conta do GitHub) |

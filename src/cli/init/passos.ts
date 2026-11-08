@@ -72,12 +72,17 @@ async function tentar(nome: string, fn: () => Promise<string>): Promise<boolean>
 }
 
 export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
-  tela.info('O Muxor lê as suas tasks nas ferramentas de gestão. Marque as que você usa (espaço marca, Enter confirma). Dá para mudar depois pelo Telegram.');
-  const escolhidas = await tela.varios<Ferramenta>('Quais ferramentas de gestão você usa?', [
-    { valor: 'funifier-pm', rotulo: 'Funifier PM' },
-    { valor: 'bnexo', rotulo: 'Bnexo' },
-    { valor: 'jira', rotulo: 'Jira (Cloud)' },
-  ]);
+  tela.info('O Muxor lê as suas tasks nas ferramentas de gestão. Marque as que você usa (espaço marca, Enter confirma, Esc volta). Dá para mudar depois pelo Telegram.');
+  let escolhidas: Ferramenta[] = [];
+  for (;;) {
+    escolhidas = await tela.varios<Ferramenta>('Quais ferramentas de gestão você usa?', [
+      { valor: 'funifier-pm', rotulo: 'Funifier PM' },
+      { valor: 'bnexo', rotulo: 'Bnexo' },
+      { valor: 'jira', rotulo: 'Jira (Cloud)' },
+    ]);
+    // Enter sem marcar nada costuma ser engano: confirma antes de seguir sem nenhuma.
+    if (escolhidas.length || !(await tela.sim('Nenhuma ferramenta marcada (o espaço marca). Marcar de novo?'))) break;
+  }
   ctx.definirEnv({
     TZ_HUB: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo',
     RESUMO_HORARIO: '09:00',
@@ -95,7 +100,8 @@ export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
     const conectou = await tentar('Funifier PM', async () => {
       const c = await connect('funifier-pm', { interactive: true });
       await c.close();
-      return await new FunifierPmAdapter(ctx.envParcial()).ping();
+      const pm = new FunifierPmAdapter(ctx.envParcial());
+      return await pm.ping().finally(() => pm.fechar());
     });
     if (conectou) ok.push('funifier-pm');
     else ctx.definirEnv({ FUNIFIER_PM_MCP_URL: null });
@@ -107,7 +113,8 @@ export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
         BNEXO_MCP_URL: await tela.texto('Endereço do MCP do Bnexo', { exemplo: 'https://…/mcp/essencial', validar: (v) => (/^https:\/\//.test(v) ? undefined : 'Começa com https://') }),
         BNEXO_MCP_TOKEN: await tela.segredo('Token do MCP do Bnexo (não aparece na tela)'),
       });
-      return await new BnexoAdapter(ctx.envParcial(), () => ({})).ping();
+      const bnexo = new BnexoAdapter(ctx.envParcial(), () => ({}));
+      return await bnexo.ping().finally(() => bnexo.fechar());
     });
     if (conectou) ok.push('bnexo');
     else ctx.definirEnv({ BNEXO_MCP_URL: null, BNEXO_MCP_TOKEN: null });
@@ -342,6 +349,14 @@ const subpastas = (p: string) => (existsSync(p) ? readdirSync(p).filter((n) => !
 export async function dePara(ctx: Ctx) {
   const pms = adaptadores(ctx);
   if (!pms.length) return tela.info('Sem ferramenta de gestão: nada para ligar.');
+  try {
+    await ligarProjetos(ctx, pms);
+  } finally {
+    await Promise.all(pms.map((pm) => pm.fechar?.()));
+  }
+}
+
+async function ligarProjetos(ctx: Ctx, pms: PmAdapter[]) {
   tela.info('Agora ligo cada projeto das suas ferramentas a uma pasta. Mostro os projetos em que você tem tasks abertas; os outros eu pergunto pelo Telegram quando chegar uma task deles.');
   for (const pm of pms) {
     const nomeFer = NOME_FERRAMENTA[pm.nome] ?? pm.nome;

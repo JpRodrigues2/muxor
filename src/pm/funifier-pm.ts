@@ -41,6 +41,11 @@ const STATUS: Record<StatusHub, string> = { em_progresso: 'in_progress', em_revi
 
 export class FunifierPmAdapter implements PmAdapter {
   readonly nome = 'funifier-pm' as const;
+  // Fecha a conexão MCP (o init usa o adaptador só para conferir o login).
+  async fechar() {
+    await this.mcp.close();
+  }
+
   private mcp = new McpConexao('funifier-pm');
   // Pai de cada subtarefa e a ordem das subtarefas de cada pai (B20). Não mudam na prática: cache do processo.
   private paiDe = new Map<string, { id: string; titulo: string } | null>();
