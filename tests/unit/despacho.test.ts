@@ -138,7 +138,7 @@ describe('despacho de ponta a ponta', () => {
     // Broker ligado: a sessão usa o MCP do hub e não recebe arquivo de credenciais.
     expect(readFileSync(arquivo, 'utf8')).toMatch(/MCP \*\*hub\*\*/);
     expect(existsSync(join(CAMINHOS.runs, String(sel), 'credenciais.json'))).toBe(false);
-    await ate(() => chat.mensagens.some((m) => m.html.includes('rodando')));
+    await ate(() => chat.mensagens.some((m) => m.html.includes('O Claude começou')));
     expect(chat.mensagens[0].html).toMatch(/Abrindo o Claude em sandbox/);
     expect(estadoSel(sel)).toBe('despachada');
     desp = despachoDe(sel).id;
@@ -148,7 +148,7 @@ describe('despacho de ponta a ponta', () => {
     exec.responder(String(sel));
     await ate(() => despachoDe(sel).estado === 'concluido');
     await ate(() => chat.dados().includes(`f:${desp}:i`));
-    expect(chat.ultima().html).toMatch(/concluída/);
+    expect(chat.ultima().html).toMatch(/O Claude terminou/);
     expect(chat.ultima().html).toMatch(/feat\/ranking/);
     expect(exec.revisao).toEqual(['in-review']);
     expect(estadoSel(sel)).toBe('finalizada');
@@ -226,7 +226,7 @@ describe('despacho de ponta a ponta', () => {
     const antes = chat.mensagens.length;
     despacho.despachar.enfileirar(outra);
     await ate(() => chat.mensagens.length === antes + 1);
-    expect(chat.ultima().html).toMatch(/na fila: a sessão está ocupada/);
+    expect(chat.ultima().html).toMatch(/Na fila: a sessão está ocupada/);
     await despacho.despachar.processar();
     expect(chat.mensagens.length).toBe(antes + 1); // mesmo motivo não repete
     expect(estadoSel(outra)).toBe('aguardando_despacho');

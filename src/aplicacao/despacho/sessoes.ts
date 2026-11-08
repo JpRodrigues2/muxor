@@ -77,7 +77,7 @@ export class Sessoes {
     if (sessoes.length) {
       const e = sessoes[0].estado;
       const motivo = e === 'limite' ? 'conta no limite de uso' : e === 'aguardando' ? 'a sessão está esperando você' : 'a sessão está ocupada';
-      await this.tasks.avisar(sel, `fila_${e}`, cartao({ icone: ICONE.fila, titulo: this.tasks.tituloHtml(sel), contexto: [esc(app.app), `na fila: ${motivo}`] }));
+      await this.tasks.avisar(sel, `fila_${e}`, cartao({ icone: ICONE.fila, titulo: `Na fila: ${motivo}`, contexto: [this.tasks.tituloHtml(sel), esc(app.app)] }));
       return null;
     }
     return this.abrir(app, sel);

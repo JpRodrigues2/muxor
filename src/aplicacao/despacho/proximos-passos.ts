@@ -79,7 +79,7 @@ export class ProximosPassos {
       if (desp.msg_fechamento) await notificador.botoes(desp.msg_fechamento);
       const branch = this.branchDaTask(desp, sel);
       const msgId = await notificador.enviar(
-        cartao({ icone: iconeDoStatus(r.status), titulo: this.tasks.tituloHtml(sel), contexto: [esc(desp.app), branch ? `<code>${esc(branch)}</code>` : null] }),
+        cartao({ icone: iconeDoStatus(r.status), titulo: 'Esperando o próximo passo', contexto: [this.tasks.tituloHtml(sel), esc(desp.app), branch ? `<code>${esc(branch)}</code>` : null] }),
         tecladoFechamento(desp.id),
       );
       despachos.guardarMsgFechamento(desp.id, msgId);
@@ -258,7 +258,7 @@ export class ProximosPassos {
     log.info('despacho: encerrado', { despachoId: desp.id, concluirTask });
     const reais = this.tasks.reais(sel);
     const continua = reais.length && !concluirTask ? `${this.ferramentasDe(reais)}: ${reais.length > 1 ? 'continuam' : 'continua'} em progresso` : null;
-    await this.d.notificador.enviar(cartao({ icone: ICONE.ok, titulo: this.tasks.tituloHtml(sel), contexto: [esc(desp.app), 'encerrada', status ?? continua] }));
+    await this.d.notificador.enviar(cartao({ icone: ICONE.ok, titulo: 'Task encerrada', contexto: [this.tasks.tituloHtml(sel), esc(desp.app), status ?? continua] }));
   }
 
   private async pedirSeguimento(desp: Despacho, seg: Seguimento) {

@@ -69,7 +69,7 @@ export class Despachar {
       return this.tasks.avisar(
         sel,
         'app_inexistente',
-        cartao({ icone: ICONE.falha, titulo: this.tasks.tituloHtml(sel), contexto: [esc(nomeApp), 'app não existe mais no apps.yaml'] }),
+        cartao({ icone: ICONE.falha, titulo: 'Não achei a pasta da task', contexto: [this.tasks.tituloHtml(sel), `${esc(nomeApp)} saiu do Muxor`] }),
       );
     }
     // Sem gamificação vinculada é permitido (o usuário já foi avisado na seleção): a sessão decide o alvo.
@@ -103,7 +103,7 @@ export class Despachar {
 
     // Confere de novo logo antes de enviar (o usuário pode ter começado a usar a sessão).
     if ((await this.sessoes.estado(alvo.handle, app.pasta, true)).estado !== 'ocioso') {
-      return this.tasks.avisar(sel, 'fila_ocupado', cartao({ icone: ICONE.fila, titulo: this.tasks.tituloHtml(sel), contexto: [esc(app.app), 'na fila: a sessão ficou ocupada'] }));
+      return this.tasks.avisar(sel, 'fila_ocupado', cartao({ icone: ICONE.fila, titulo: 'Na fila: a sessão do Claude está ocupada', contexto: [this.tasks.tituloHtml(sel), esc(app.app)] }));
     }
     await executor.send(alvo.handle, linhaDespacho(arquivo));
 
@@ -123,9 +123,8 @@ export class Despachar {
     await notificador.enviar(
       cartao({
         icone: ICONE.rodando,
-        titulo: this.tasks.tituloHtml(sel),
-        contexto: [esc(app.app), 'rodando', status],
-        corpo: [campo('Prompt', `<code>${esc(relativo(arquivo))}</code>`), anexos ? campo('Anexos', String(anexos)) : null],
+        titulo: 'O Claude começou',
+        contexto: [this.tasks.tituloHtml(sel), esc(app.app), anexos ? `${anexos} ${anexos === 1 ? 'anexo' : 'anexos'}` : null, status],
       }),
     );
 
@@ -143,7 +142,7 @@ export class Despachar {
     if (!app || !seg) {
       despachos.desistirSeguimento(desp.id);
       await notificador.enviar(
-        cartao({ icone: ICONE.falha, titulo: this.tasks.tituloHtml(sel), contexto: [esc(desp.app), !app ? 'o app sumiu do apps.yaml' : 'pedido inválido'] }),
+        cartao({ icone: ICONE.falha, titulo: !app ? 'Não achei a pasta da task' : 'Pedido inválido', contexto: [this.tasks.tituloHtml(sel), esc(desp.app)] }),
       );
       return;
     }
@@ -165,7 +164,7 @@ export class Despachar {
     });
 
     if ((await this.sessoes.estado(alvo.handle, app.pasta, true)).estado !== 'ocioso') {
-      return this.tasks.avisar(sel, 'fila_ocupado', cartao({ icone: ICONE.fila, titulo: this.tasks.tituloHtml(sel), contexto: [esc(app.app), 'na fila: a sessão ficou ocupada'] }));
+      return this.tasks.avisar(sel, 'fila_ocupado', cartao({ icone: ICONE.fila, titulo: 'Na fila: a sessão do Claude está ocupada', contexto: [this.tasks.tituloHtml(sel), esc(app.app)] }));
     }
     await executor.send(alvo.handle, linhaDespacho(arquivo));
     despachos.iniciarSeguimento({ id: desp.id, selecaoId: sel.id, rodada, arquivo, handle: alvo.handle, tituloTerminal: alvo.title });
@@ -173,9 +172,8 @@ export class Despachar {
     await notificador.enviar(
       cartao({
         icone: seg.tipo === 'pr' ? ICONE.pr : ICONE.rodando,
-        titulo: this.tasks.tituloHtml(sel),
-        contexto: [esc(app.app), seg.tipo === 'pr' ? 'abrindo PR' : 'rodando instrução', `rodada ${rodada}`],
-        corpo: [campo('Prompt', `<code>${esc(relativo(arquivo))}</code>`)],
+        titulo: seg.tipo === 'pr' ? 'Abrindo o PR' : 'O Claude seguiu a sua instrução',
+        contexto: [this.tasks.tituloHtml(sel), esc(app.app), `rodada ${rodada}`],
       }),
     );
     this.monitor.monitorar(desp.id);

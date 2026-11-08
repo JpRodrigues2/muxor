@@ -622,12 +622,13 @@ export async function teste() {
   const db = openDb();
   const agora = new Date().toISOString();
   const taskId = `teste-init-${Date.now()}`;
-  const titulo = 'Teste do muxor init: responda só com o bloco de resultado, sem alterar nada';
+  const titulo = 'Teste da instalação';
+  const descricao = 'Teste da instalação do Muxor. Não altere nada na pasta: só responda com o bloco de resultado.';
   const id = db.transaction(() => {
     db.prepare(
-      `INSERT INTO tasks_vistas (ferramenta, task_id, espaco, titulo, projeto_id, projeto_nome, status, prazo, link, primeira_vez, ultima_vez)
-       VALUES ('teste', ?, '', ?, NULL, 'sandbox', 'teste', NULL, NULL, ?, ?)`,
-    ).run(taskId, titulo, agora, agora);
+      `INSERT INTO tasks_vistas (ferramenta, task_id, espaco, titulo, descricao, projeto_id, projeto_nome, status, prazo, link, primeira_vez, ultima_vez)
+       VALUES ('teste', ?, '', ?, ?, NULL, 'sandbox', 'teste', NULL, NULL, ?, ?)`,
+    ).run(taskId, titulo, descricao, agora, agora);
     const sel = Number(
       db
         .prepare(`INSERT INTO selecoes (ferramenta, task_id, data_resumo, app, estado, criado_em, atualizado_em) VALUES ('teste', ?, ?, 'sandbox', 'aguardando_despacho', ?, ?)`)

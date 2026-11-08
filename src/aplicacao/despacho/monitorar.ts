@@ -113,8 +113,8 @@ export class Monitor {
           'limite',
           cartao({
             icone: ICONE.pausa,
-            titulo: nome,
-            contexto: [esc(d.app), 'pausada: conta no limite de uso'],
+            titulo: 'Pausada: a conta chegou ao limite de uso',
+            contexto: [nome, esc(d.app)],
             rodape: 'Troque de conta no Orca. Eu retomo sozinho.',
           }),
         );
@@ -126,8 +126,8 @@ export class Monitor {
           'usuario',
           cartao({
             icone: ICONE.voce,
-            titulo: nome,
-            contexto: [esc(d.app), 'precisa de você no Orca'],
+            titulo: 'O Claude precisa de você no Orca',
+            contexto: [nome, esc(d.app)],
             corpo: [...(leitura.agente?.pergunta ? [`<b>${esc(curto(leitura.agente.pergunta, 300))}</b>`] : []), `<pre>${esc(ultimasLinhas(leitura.tela))}</pre>`],
           }),
         );
@@ -193,8 +193,8 @@ export class Monitor {
     await notificador.enviar(
       cartao({
         icone: ICONE.falha,
-        titulo: sel ? this.tasks.tituloHtml(sel) : `#${d.selecao_id}`,
-        contexto: [esc(d.app), 'interrompida: o terminal sumiu'],
+        titulo: 'Task interrompida: a aba do Claude fechou',
+        contexto: [sel ? this.tasks.tituloHtml(sel) : `#${d.selecao_id}`, esc(d.app)],
         rodape: 'A aba fechou ou o Orca reiniciou. Mande a task de novo se precisar.',
       }),
     );
@@ -223,13 +223,13 @@ export class Monitor {
     // 4. Mensagem com os próximos passos.
     const sel = this.d.selecoes.obter(d.selecao_id);
     const icone = r.status === 'concluido' ? ICONE.ok : r.status === 'bloqueado' ? ICONE.bloqueado : ICONE.revisao;
-    const estado = { concluido: 'concluída', bloqueado: 'bloqueada', precisa_revisao: 'precisa de revisão' }[r.status] ?? r.status;
+    const estado = { concluido: 'O Claude terminou', bloqueado: 'O Claude parou: bloqueado', precisa_revisao: 'O Claude terminou: precisa de revisão' }[r.status] ?? r.status;
     const pendencias = r.pendencias && !/^nenhuma/i.test(r.pendencias) ? r.pendencias : null;
     const msgId = await this.d.notificador.enviar(
       cartao({
         icone,
-        titulo: sel ? this.tasks.tituloHtml(sel) : `#${d.selecao_id}`,
-        contexto: [esc(d.app), estado, d.rodada > 1 ? `rodada ${d.rodada}` : null],
+        titulo: estado,
+        contexto: [sel ? this.tasks.tituloHtml(sel) : `#${d.selecao_id}`, esc(d.app), d.rodada > 1 ? `rodada ${d.rodada}` : null],
         corpo: [
           esc(r.resumo ?? ''),
           '',
@@ -238,7 +238,7 @@ export class Monitor {
           pendencias ? campo('Pendências', esc(pendencias)) : null,
           ...notas,
         ],
-        rodape: 'Revise no Orca e escolha o próximo passo.',
+        rodape: 'Revise no Orca e escolha o próximo passo abaixo.',
       }),
       tecladoFechamento(d.id),
     );
