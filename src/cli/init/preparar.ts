@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { rodar } from '../diagnostico.js';
 import type { Alteracao } from '../estado.js';
-import { tela } from '../tela.js';
+import { destaque, tela } from '../tela.js';
 import type { Ctx } from './contexto.js';
 import { completarPath, conferir, instalar, Instalador, PROGRAMAS, TAILSCALE_BIN, type IdPrograma, type Programa } from './programas.js';
 
@@ -41,60 +41,60 @@ export async function preRequisitos(ctx: Ctx) {
   instalador ??= new Instalador(log, (p) => ctx.registrar(registroDe(p)));
 
   if (Number(process.version.slice(1).split('.')[0]) < 22) {
-    tela.erro(`O Muxor precisa do Node 22 ou mais novo (você tem ${process.version}). Rode o instalador do site de novo: curl -fsSL https://muxor.com.br/install | bash`);
+    tela.erro(`O Muxor precisa do Node 22 ou mais novo. Você tem o ${process.version}. Rode o instalador de novo: curl -fsSL https://muxor.com.br/install | bash`);
     throw new Interrompido();
   }
   if (!(await rodar('git', ['--version'])).ok) {
-    tela.erro('Falta o git (as "Command Line Tools" da Apple). Rode xcode-select --install, aceite a janela e rode o muxor init de novo.');
+    tela.erro('Falta o git. Rode xcode-select --install, clique em Instalar na janela da Apple e depois rode muxor init.');
     throw new Interrompido();
   }
-  const situacao = await tela.esperando('Conferindo os programas de que o Muxor precisa…', () => conferir(NECESSARIOS), (s) => `${s.filter((x) => x.ok).length} de ${s.length} programas prontos`);
+  const situacao = await tela.esperando('Conferindo os programas', () => conferir(NECESSARIOS), (s) => `${s.filter((x) => x.ok).length} de ${s.length} programas prontos`);
   const faltam = situacao.filter((s) => !s.ok);
   if (faltam.length) {
     const temBrew = existsSync('/opt/homebrew/bin/brew') || existsSync('/usr/local/bin/brew');
     if (!temBrew && faltam.some((s) => s.p.como.startsWith('brew'))) {
-      tela.erro('Falta o Homebrew (instalador de programas do Mac). Rode o instalador do site, que cuida dele: curl -fsSL https://muxor.com.br/install | bash');
+      tela.erro('Falta o Homebrew. Rode o instalador do site, que instala ele: curl -fsSL https://muxor.com.br/install | bash');
       throw new Interrompido();
     }
     tela.nota(
       [
         'Vou instalar:',
-        ...faltam.map((s) => `  • ${s.p.nome}: ${s.p.paraQue}${s.versao ? ` (você tem a ${s.versao}; preciso da ${s.p.minima} ou mais nova)` : ''}`),
+        ...faltam.map((s) => `  ${s.p.nome}: ${s.p.paraQue}${s.versao ? `. Você tem a ${s.versao}, preciso da ${s.p.minima} ou mais nova` : ''}`),
         '',
-        ...(faltam.some((s) => s.p.senha) ? ['O Tailscale pede a senha do Mac (a mesma de entrar no Mac): ele instala uma VPN.'] : []),
-        'O resto baixa em segundo plano enquanto você segue a configuração.',
+        ...(faltam.some((s) => s.p.senha) ? ['O Tailscale pede a senha do Mac, a mesma de entrar nele.'] : []),
+        'O resto instala em segundo plano enquanto você segue.',
       ].join('\n'),
       'Programas',
     );
     if (!(await tela.sim('Instalar agora?'))) {
-      tela.info(`Sem eles o Muxor não funciona. Para instalar você mesmo, veja ${GUIA}; depois rode muxor init de novo.`);
+      tela.info(`O Muxor precisa deles. Para instalar você mesmo, veja ${GUIA} e depois rode muxor init.`);
       throw new Interrompido();
     }
     const orcaAberto = (await rodar('/usr/bin/pgrep', ['-x', 'Orca'])).ok;
     for (const s of faltam) {
       if (s.p.id === 'orca' && s.versao && orcaAberto) {
-        tela.aviso(`O seu Orca (${s.versao}) é antigo para o Muxor. Atualize por ele: menu Orca → Check for Updates. Confiro de novo quando chegar a vez dele.`);
+        tela.aviso(`Seu Orca ${s.versao} é antigo. Atualize pelo menu Orca › Check for Updates. Confiro de novo mais adiante.`);
         continue;
       }
       if (!s.p.senha && !s.p.como.startsWith('brew')) instalador.iniciar(s.p);
     }
     for (const s of faltam.filter((x) => x.p.senha)) {
-      tela.info(`Instalando o ${s.p.nome}. Quando aparecer "Password:", digite a senha do Mac (ela não aparece enquanto você digita) e aperte Enter.`);
+      tela.info(`Instalando o ${s.p.nome}. Em Password, digite a senha do Mac e aperte Enter. Ela não aparece enquanto você digita.`);
       try {
         await instalar(s.p, log);
         ctx.registrar(registroDe(s.p));
         tela.ok(`${s.p.nome} instalado.`);
       } catch (e) {
-        tela.aviso(`${s.p.nome}: ${(e as Error).message}. Tento de novo no passo do front-end.`);
+        tela.aviso(`${s.p.nome} não instalou: ${(e as Error).message}. Tento de novo no passo do front-end.`);
       }
     }
     for (const s of faltam) if (s.p.como === 'brew' || (s.p.como === 'brew-cask' && !s.p.senha)) instalador.iniciar(s.p);
     const fundo = faltam.filter((s) => instalador!.pendente(s.p.id));
-    if (fundo.length) tela.ok(`Instalando em segundo plano: ${fundo.map((s) => s.p.nome).join(', ')}. O registro fica em ${log}.`);
-  } else tela.ok('GitHub CLI, Claude Code, Orca e Tailscale instalados.');
+    if (fundo.length) tela.ok(`Instalando em segundo plano: ${fundo.map((s) => s.p.nome).join(', ')}.`);
+  } else tela.ok('Programas prontos.');
 
   if (!ctx.estado.passos.appsCelular) {
-    await tela.link(PAGINA_CELULAR, 'No celular: instale o Telegram, o Orca e o Tailscale (leia o QR code)', { qr: true });
+    await tela.link(PAGINA_CELULAR, 'Leia com o celular e instale o Telegram, o Orca e o Tailscale', { qr: true });
     ctx.estado.passos.appsCelular = new Date().toISOString();
     ctx.salvar();
   }
@@ -107,17 +107,17 @@ export async function esperar(id: IdPrograma) {
   const t = instalador?.pendente(id);
   if (t) {
     try {
-      await tela.esperando(`Terminando de instalar o ${p.nome}…`, () => t, () => `${p.nome} instalado`);
+      await tela.esperando(`Terminando de instalar o ${p.nome}`, () => t, () => `${p.nome} instalado`);
     } catch (e) {
       tela.erro(`Não consegui instalar o ${p.nome}: ${(e as Error).message}`);
-      tela.info(`Como instalar à mão: ${GUIA}. Depois rode muxor init de novo: eu continuo daqui.`);
+      tela.info(`Para instalar à mão, veja ${GUIA}. Depois rode muxor init, que continua daqui.`);
       throw new Interrompido();
     }
   }
   const [s] = await conferir([id]);
   if (!s.ok) {
-    tela.erro(s.versao ? `O ${p.nome} ${s.versao} é antigo: preciso da ${p.minima} ou mais nova.` : `Falta o ${p.nome}.`);
-    tela.info(`Rode muxor init de novo para eu instalar (ou veja ${GUIA}).`);
+    tela.erro(s.versao ? `O ${p.nome} ${s.versao} é antigo. Preciso da ${p.minima} ou mais nova.` : `Falta o ${p.nome}.`);
+    tela.info('Rode muxor init de novo para eu instalar.');
     throw new Interrompido();
   }
 }
@@ -126,13 +126,13 @@ export async function claudeComLogin() {
   await esperar('claude');
   const logado = async () => /"loggedIn":\s*true/.test((await rodar('claude', ['auth', 'status'])).saida);
   if (await logado()) return;
-  tela.info('Falta entrar no Claude Code com a sua conta (a assinatura que ele vai usar). Vou abrir o login no navegador.');
+  tela.info('Entre no Claude Code com a conta da sua assinatura. O login abre no navegador.');
   await new Promise<void>((ok) => spawn('claude', ['auth', 'login'], { stdio: 'inherit' }).on('close', () => ok()));
   if (!(await logado())) {
-    tela.erro('O Claude Code continua sem login. Rode `claude` num terminal, entre com a sua conta e rode muxor init de novo.');
+    tela.erro('O Claude Code continua sem login. Rode claude num terminal, entre e depois rode muxor init.');
     throw new Interrompido();
   }
-  tela.ok('Claude Code com login.');
+  tela.ok('Claude Code conectado.');
 }
 
 export async function orcaAberto() {
@@ -140,9 +140,9 @@ export async function orcaAberto() {
   for (;;) {
     const s = await rodar(ORCA_BIN, ['status', '--json']);
     if (s.ok && /"reachable":\s*true/.test(s.saida)) break;
-    tela.aviso('O Orca precisa estar aberto. Vou abri-lo agora. Na primeira vez o Mac pergunta se quer abrir um app baixado da internet: clique em Abrir.');
+    tela.aviso('Abri o Orca. Se o Mac perguntar se quer abrir um app baixado da internet, clique em Abrir.');
     await rodar('open', ['-a', 'Orca']);
-    await tela.enter('Quando a janela do Orca aparecer, aperte Enter');
+    await tela.enter('Aperte Enter quando a janela do Orca aparecer');
   }
   tela.ok('Orca aberto.');
 }
@@ -183,12 +183,12 @@ async function aguardar(texto: string, ok: (s: EstadoTailscale) => boolean, minu
         await new Promise((r) => setTimeout(r, 3000));
       }
     },
-    (s) => (ok(s) ? 'Conectado' : 'Ainda não conectou'),
+    (s) => (ok(s) ? 'Conectado' : 'Não conectou em 10 minutos'),
   );
 }
 
 async function pularOuParar(oQue: string) {
-  if (await tela.sim(`${oQue} Pular por agora? (dá para fazer depois com muxor init --refazer front)`, false)) return true;
+  if (await tela.sim(`${oQue} Pular por agora? Dá para fazer depois com muxor init --refazer front`, false)) return true;
   throw new Interrompido();
 }
 
@@ -199,15 +199,14 @@ export function ngrokTemToken(caminho: string) {
 export async function front(ctx: Ctx) {
   tela.nota(
     [
-      'Para abrir no celular o front-end que o Claude sobe neste Mac (o localhost), o Muxor usa o Tailscale: uma rede',
-      'privada só entre os seus aparelhos. É grátis, não cria link público e o endereço não muda.',
-      'Para mostrar o front a outra pessoa, o ngrok gera um link público (opcional, logo depois).',
+      'Para abrir no celular o front-end que o Claude roda neste Mac, o Muxor usa o Tailscale,',
+      'uma rede privada só entre os seus aparelhos. É grátis e não cria link público.',
     ].join('\n'),
     'Front-end no celular',
   );
-  if (!(await tela.sim('Configurar agora? (recomendado se você mexe com front-end)'))) return;
+  if (!(await tela.sim('Configurar agora? Recomendado se você mexe com front-end'))) return;
   if (!(await conferir(['tailscale']))[0].ok && !instalador?.pendente('tailscale')) {
-    tela.info('Instalando o Tailscale. Quando aparecer "Password:", digite a senha do Mac e aperte Enter.');
+    tela.info('Instalando o Tailscale. Em Password, digite a senha do Mac e aperte Enter.');
     await instalar(PROGRAMAS.tailscale, join(ctx.casa.logs, 'instalacao.log'));
     ctx.registrar(registroDe(PROGRAMAS.tailscale));
   }
@@ -218,39 +217,39 @@ export async function front(ctx: Ctx) {
     await rodar('open', ['-a', 'Tailscale']);
     tela.nota(
       [
-        '1. O Mac vai pedir para permitir a configuração de VPN do Tailscale: clique em Permitir (Allow).',
-        '   Se ele mandar ativar em Ajustes → Privacidade e Segurança, ative e volte para cá.',
-        '2. No ícone do Tailscale na barra de menus (no alto, à direita), clique em Log in e entre com uma conta',
-        '   (Google, GitHub, Microsoft ou Apple). Lembre qual: o celular entra com a mesma.',
+        '1. O Mac pede para permitir a VPN do Tailscale. Clique em Permitir.',
+        '   Se ele mandar ativar em Ajustes › Privacidade e Segurança, ative e volte.',
+        '2. Clique no ícone do Tailscale na barra de menus, no alto à direita, e em Log in.',
+        '   Entre com Google, GitHub, Microsoft ou Apple. O celular vai entrar com a mesma conta.',
       ].join('\n'),
       'Tailscale no Mac',
     );
-    s = await aguardar('Esperando o Tailscale do Mac conectar (até 10 min)…', (x) => x.rodando, 10);
+    s = await aguardar('Esperando o Tailscale do Mac conectar', (x) => x.rodando, 10);
     if (!s.rodando && (await pularOuParar('O Tailscale do Mac não conectou.'))) return;
   }
-  tela.ok(`Tailscale do Mac conectado (${s.mac ?? 'este Mac'}).`);
+  tela.ok('Tailscale do Mac conectado.');
 
   if (!s.celulares.length) {
-    await tela.link(PAGINA_CELULAR, 'No celular: instale o Tailscale e entre com a MESMA conta do Mac', { qr: true });
-    s = await aguardar('Esperando o celular aparecer na sua rede do Tailscale (até 10 min)…', (x) => x.celulares.length > 0, 10);
+    await tela.link(PAGINA_CELULAR, `Leia com o celular, instale o Tailscale e entre com ${destaque('a mesma conta do Mac')}`, { qr: true });
+    s = await aguardar('Esperando o celular entrar no Tailscale', (x) => x.celulares.length > 0, 10);
     if (!s.celulares.length && (await pularOuParar('Não vi nenhum celular na sua rede do Tailscale.'))) return;
   }
-  tela.ok(`Celular na sua rede do Tailscale (${s.celulares.join(', ')}).`);
+  tela.ok(`Celular conectado: ${s.celulares.join(', ')}.`);
 
-  if (!(await tela.sim('Quer também poder mandar um link público do seu front para outra pessoa (ngrok)?'))) return;
+  if (!(await tela.sim('Quer poder mandar um link público do seu front para outra pessoa? Usa o ngrok', false))) return;
   if (!(await conferir(['ngrok']))[0].ok) {
     instalador?.iniciar(PROGRAMAS.ngrok) ?? (await instalar(PROGRAMAS.ngrok, join(ctx.casa.logs, 'instalacao.log')));
     await esperar('ngrok');
   }
   const cfg = (await rodar('ngrok', ['config', 'check'])).saida.match(/at (.+\.yml)/)?.[1] ?? '';
   if (!ngrokTemToken(cfg)) {
-    await tela.link('https://dashboard.ngrok.com/get-started/your-authtoken', 'Crie uma conta grátis no ngrok (ou entre) e copie o seu Authtoken', { abrir: true });
-    const token = await tela.segredo('Cole o Authtoken do ngrok', (v) => (/^[A-Za-z0-9_-]{20,}$/.test(v) ? undefined : 'O Authtoken tem só letras, números, _ e -.'));
+    await tela.link('https://dashboard.ngrok.com/get-started/your-authtoken', 'Entre ou crie uma conta grátis no ngrok e copie o Authtoken', { abrir: true });
+    const token = await tela.segredo('Authtoken do ngrok', (v) => (/^[A-Za-z0-9_-]{20,}$/.test(v) ? undefined : 'Copie o Authtoken inteiro.'));
     const r = await rodar('ngrok', ['config', 'add-authtoken', token]);
     if (!r.ok) {
       tela.erro('O ngrok não aceitou o token. Confira se copiou o Authtoken inteiro.');
       throw new Interrompido();
     }
   }
-  tela.ok('ngrok pronto (link público só quando você pedir).');
+  tela.ok('ngrok pronto. O link público só abre quando você pedir.');
 }

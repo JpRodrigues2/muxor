@@ -24,13 +24,13 @@ logins, permissões) ele pede na hora, com o passo a passo.
 |---|---|---|---|
 | 1 | Programas | Confirma a lista do que falta (GitHub CLI, Claude Code, Orca, Tailscale) e digita a senha do Mac para o Tailscale. O resto baixa em segundo plano enquanto você segue. Um QR code abre no celular a lista dos apps para instalar lá | A senha do Mac; o celular |
 | 2 | Onde roda | Escolhe "Neste Mac" | — |
-| 3 | Ferramentas de gestão | Marca as que usa e faz o login de cada uma | Funifier PM: login no navegador. Bnexo: endereço e token do MCP. Jira: endereço do site, e-mail e API token (a página de criar abre sozinha) |
+| 3 | Ferramentas de gestão | Marca as que usa e faz o login de cada uma | Funifier PM: login no navegador. Bnexo: endereço e token do MCP. Jira: o nome do site (o que vem antes de .atlassian.net), o e-mail e um API token; a página do token abre sozinha |
 | 4 | Espaços | Para cada conta do GitHub: nome, pasta, login no navegador (com um código de 8 letras), nome e e-mail dos commits, regras de trabalho. Se o GitHub perguntar "Authenticate Git with your GitHub credentials?", responda **N**: o Muxor já faz isso só para a pasta do espaço | As senhas do GitHub |
 | 5 | Projetos que você já tem no Orca | Marca quais trazer para o Muxor. O que entra recebe tasks (o Muxor escreve inclusive nas sessões que já existem nessa pasta); o que fica de fora o Muxor nunca toca | — |
-| 6 | Repositórios | Cola no seu Claude Code o pedido que o Muxor copiou e diz quais repositórios quer | — |
-| 7 | Projetos → pastas | Para cada projeto das ferramentas, escolhe a pasta (ou cria uma sem repositório, ou deixa para depois) | — |
-| 8 | Telegram | Cria um bot no BotFather, cola o token e manda /start para ele | O celular com o Telegram |
-| 9 | Orca e celular | Opcional: pareia o celular pelo Relay (qualquer rede) | O celular com o app do Orca |
+| 6 | Baixar repositórios | Só se faltar algum: cola no seu Claude Code o pedido que o Muxor copiou | — |
+| 7 | Ligar projetos às pastas | Recomendado: deixar para o Telegram, que pergunta a pasta quando chega uma task de um projeto sem pasta. Ou ligar agora os projetos com tasks abertas | — |
+| 8 | Bot do Telegram | Pelo celular: lê o QR do BotFather, manda /newbot, dá dois nomes (primeiro o que aparece nos contatos, depois o usuário terminado em bot) e cola o token. Depois lê o QR do seu bot e toca em Iniciar | O celular com o Telegram |
+| 9 | Orca e celular | Opcional. No Orca do Mac: Settings › Mobile, escolhe **Orca Relay** (não LAN), Sign in for Relay e Generate code. No celular: Pair Desktop e lê o QR | O celular com o app do Orca |
 | 10 | Front-end no celular | Opcional: permite a VPN do Tailscale no Mac, entra numa conta e entra com a mesma no celular. O ngrok (link público, para mostrar a outra pessoa) é opcional: cria uma conta grátis e cola o Authtoken | O celular com o app do Tailscale |
 | 11 | Serviço | Nada: o Muxor vira um serviço que sobe sozinho com o Mac | — |
 | 12 | Teste | Acompanha uma task de teste no Orca e no Telegram | — |

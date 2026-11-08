@@ -20,7 +20,7 @@ const PASSOS: Passo[] = [
   { id: 'ferramentas', titulo: 'Ferramentas de gestão', rodar: async (c) => (c.estado.passos.ferramentasOk = JSON.stringify(await passos.ferramentas(c))) },
   { id: 'espacos', titulo: 'Espaços e contas do GitHub', rodar: (c) => passos.espacos(c) },
   { id: 'existentes', titulo: 'Projetos que você já tem no Orca', rodar: (c) => passos.existentes(c) },
-  { id: 'repositorios', titulo: 'Baixar repositórios (opcional)', rodar: (c) => passos.repositorios(c) },
+  { id: 'repositorios', titulo: 'Baixar repositórios', rodar: (c) => passos.repositorios(c) },
   { id: 'depara', titulo: 'Ligar projetos às pastas', rodar: (c) => passos.dePara(c) },
   { id: 'telegram', titulo: 'Bot do Telegram', rodar: (c) => passos.telegram(c) },
   { id: 'orca', titulo: 'Orca e celular', rodar: () => passos.orca() },
@@ -39,7 +39,7 @@ export async function init(casa: Casa, refazer?: string) {
     for (const p of PASSOS.slice(PASSOS.findIndex((p) => p.id === refazer))) delete estado.passos[p.id];
   }
   const sair = () => {
-    tela.fim('Parei aqui. Rode `muxor init` de novo para continuar de onde parou (ou voltar a um passo).');
+    tela.fim('Parei aqui. Rode muxor init para continuar ou voltar a um passo.');
     return 1;
   };
   const ctx = criarCtx(casa, estado);
@@ -93,7 +93,7 @@ export async function init(casa: Casa, refazer?: string) {
         continue;
       }
       // Retomando, o passo 1 é só a conferência rápida dos programas: não parece que recomeçou do zero.
-      if (p.sempre && feitos) tela.info('Conferindo os programas antes de continuar…');
+      if (p.sempre && feitos) tela.info('Conferindo os programas antes de continuar');
       else tela.passo(i + 1, PASSOS.length, p.titulo, PASSOS.slice(0, i).some((x) => !x.sempre));
       const anterior = PASSOS.slice(0, i).findLastIndex((x) => !x.sempre);
       tela.botaoVoltar = anterior >= 0; // no primeiro passo não há para onde voltar
@@ -111,10 +111,10 @@ export async function init(casa: Casa, refazer?: string) {
         if (!(e instanceof Parou)) throw e;
         // Esc numa pergunta: voltar um passo, refazer este ou sair (o que já foi feito fica salvo).
         const escolha = await tela
-          .escolher('Pausado. O que quer fazer?', [
+          .escolher('Pausado. O que fazer?', [
             ...(anterior >= 0 ? [{ valor: 'voltar', rotulo: `Voltar ao passo ${anterior + 1} · ${PASSOS[anterior].titulo}` }] : []),
-            { valor: 'refazer', rotulo: `Refazer este passo (${p.titulo})` },
-            { valor: 'sair', rotulo: 'Sair e continuar depois (muxor init)' },
+            { valor: 'refazer', rotulo: `Refazer o passo ${p.titulo}` },
+            { valor: 'sair', rotulo: 'Sair. Para continuar depois, rode muxor init' },
           ], undefined, { semVoltar: true })
           .catch((x) => {
             if (x instanceof Parou) return 'sair';
@@ -134,14 +134,14 @@ export async function init(casa: Casa, refazer?: string) {
   } catch (e) {
     if (e instanceof Parou) return sair();
     if (e instanceof passos.Interrompido) {
-      tela.fim('Rode `muxor init` de novo quando resolver: eu continuo deste passo.');
+      tela.fim('Quando resolver, rode muxor init. Eu continuo deste passo.');
       return 1;
     }
     tela.erro(`Erro inesperado: ${(e as Error).message}`);
-    tela.fim('Rode `muxor diagnostico` para ver o que falta, e `muxor init` de novo para continuar.');
+    tela.fim('Rode muxor diagnostico para ver o que falta e muxor init para continuar.');
     return 1;
   }
   passos.resumoFinal(JSON.parse(estado.passos.ferramentasOk ?? '[]'));
-  tela.fim('Hub configurado. Bom trabalho!');
+  tela.fim('Muxor configurado. Mande /tarefas no bot do Telegram para começar.');
   return 0;
 }

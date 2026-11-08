@@ -12,7 +12,7 @@ import { JiraAdapter } from '../../pm/jira.js';
 import type { PmAdapter } from '../../pm/types.js';
 import { ghDoEspaco, gitconfigDoEspaco } from '../casa.js';
 import { rodar } from '../diagnostico.js';
-import { tela } from '../tela.js';
+import { destaque, tela } from '../tela.js';
 import { MODELO_REGRAS, type Ctx } from './contexto.js';
 import { aplicarContaGit } from './git-espaco.js';
 import { conteudoPlist, instalarServico, pararServico, ROTULO } from './servico-mac.js';
@@ -40,8 +40,8 @@ export async function escolherModo(ctx: Ctx): Promise<'local' | 'servidor'> {
   const modo = await tela.escolher(
     'Onde o Muxor vai rodar?',
     [
-      { valor: 'local', rotulo: 'Neste Mac', dica: 'o Mac precisa ficar ligado para as tasks rodarem' },
-      { valor: 'servidor', rotulo: 'Num servidor meu (VPS)', dica: 'roda 24 h; o Mac e o celular só acompanham' },
+      { valor: 'local', rotulo: 'Neste Mac', dica: 'as tasks rodam com o Mac ligado' },
+      { valor: 'servidor', rotulo: 'Num servidor meu', dica: 'roda 24 h, com o Mac desligado' },
     ],
     'local',
   );
@@ -49,7 +49,7 @@ export async function escolherModo(ctx: Ctx): Promise<'local' | 'servidor'> {
   ctx.salvar();
   if (modo === 'servidor') {
     tela.nota(
-      'No modo servidor, o muxor init roda no próprio servidor, depois de prepará-lo.\nSiga instalacao/modo-servidor.md: ele explica como criar o servidor, entrar por SSH e rodar o muxor init lá.',
+      'No servidor, a configuração roda lá. Siga o guia: muxor.com.br/docs/modo-servidor',
       'Modo servidor',
     );
     throw new Interrompido();
@@ -62,7 +62,7 @@ export async function escolherModo(ctx: Ctx): Promise<'local' | 'servidor'> {
 async function tentar(nome: string, fn: () => Promise<string>): Promise<boolean> {
   for (;;) {
     try {
-      await tela.esperando(`Conferindo o ${nome}…`, fn, (r) => `${nome}: conectado (${r})`);
+      await tela.esperando(`Conectando ao ${nome}`, fn, (r) => `${nome} conectado: ${r}`);
       return true;
     } catch (e) {
       tela.erro(`${nome}: ${(e as Error).message}`);
@@ -72,16 +72,15 @@ async function tentar(nome: string, fn: () => Promise<string>): Promise<boolean>
 }
 
 export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
-  tela.info('O Muxor lê as suas tasks nas ferramentas de gestão. Marque as que você usa (espaço marca, Enter confirma, Esc volta). Dá para mudar depois pelo Telegram.');
   let escolhidas: Ferramenta[] = [];
   for (;;) {
-    escolhidas = await tela.varios<Ferramenta>('Quais ferramentas de gestão você usa?', [
+    escolhidas = await tela.varios<Ferramenta>('De onde vêm as suas tasks? Marque com Espaço', [
       { valor: 'funifier-pm', rotulo: 'Funifier PM' },
       { valor: 'bnexo', rotulo: 'Bnexo' },
-      { valor: 'jira', rotulo: 'Jira (Cloud)' },
+      { valor: 'jira', rotulo: 'Jira Cloud' },
     ]);
     // Enter sem marcar nada costuma ser engano: confirma antes de seguir sem nenhuma.
-    if (escolhidas.length || !(await tela.sim('Nenhuma ferramenta marcada (o espaço marca). Marcar de novo?'))) break;
+    if (escolhidas.length || !(await tela.sim('Nenhuma marcada. Marcar de novo?'))) break;
   }
   ctx.definirEnv({
     TZ_HUB: Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Sao_Paulo',
@@ -90,12 +89,12 @@ export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
     HUB_COMENTARIOS_PM: 'false', // nunca comenta sem pedido (B02)
     ORCA_BIN,
   });
-  if (!escolhidas.length) tela.aviso('Sem ferramenta de gestão: o Muxor vai servir só para atividades avulsas (/nova no Telegram).');
+  if (!escolhidas.length) tela.aviso('Sem ferramenta de gestão, você manda atividades avulsas pelo /nova no Telegram.');
 
   const ok: Ferramenta[] = [];
   if (escolhidas.includes('funifier-pm')) {
     ctx.definirEnv({ FUNIFIER_PM_MCP_URL: 'https://pm-mcp.funifier.com/mcp' });
-    tela.info('Funifier PM: vou abrir o login no navegador. Entre com a sua conta, autorize o "Muxor" e volte aqui.');
+    tela.info('Funifier PM: o login abre no navegador. Entre, autorize o Muxor e volte aqui.');
     const { connect } = await import('../../pm/mcp-client.js');
     const conectou = await tentar('Funifier PM', async () => {
       const c = await connect('funifier-pm', { interactive: true });
@@ -107,11 +106,11 @@ export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
     else ctx.definirEnv({ FUNIFIER_PM_MCP_URL: null });
   }
   if (escolhidas.includes('bnexo')) {
-    tela.info('Bnexo: você precisa do endereço do MCP e de um token. No Bnexo: Configurações → Integrações → MCP.');
+    tela.info('Bnexo: pegue o endereço e o token em Configurações › Integrações › MCP.');
     const conectou = await tentar('Bnexo', async () => {
       ctx.definirEnv({
-        BNEXO_MCP_URL: await tela.texto('Endereço do MCP do Bnexo', { exemplo: 'https://…/mcp/essencial', validar: (v) => (/^https:\/\//.test(v) ? undefined : 'Começa com https://') }),
-        BNEXO_MCP_TOKEN: await tela.segredo('Token do MCP do Bnexo (não aparece na tela)'),
+        BNEXO_MCP_URL: await tela.texto('Endereço do MCP do Bnexo', { validar: (v) => (/^https:\/\//.test(v) ? undefined : 'O endereço começa com https://') }),
+        BNEXO_MCP_TOKEN: await tela.segredo('Token do MCP do Bnexo'),
       });
       const bnexo = new BnexoAdapter(ctx.envParcial(), () => ({}));
       return await bnexo.ping().finally(() => bnexo.fechar());
@@ -120,13 +119,13 @@ export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
     else ctx.definirEnv({ BNEXO_MCP_URL: null, BNEXO_MCP_TOKEN: null });
   }
   if (escolhidas.includes('jira')) {
-    tela.info('Jira: você precisa do endereço do site, do seu e-mail e de um API token. Vou abrir a página de criar o token.');
-    await tela.link('https://id.atlassian.com/manage-profile/security/api-tokens', 'Criar o API token do Jira (Create API token, dê um nome como "hub")', { abrir: true });
+    tela.info('Jira: abri a página do token no navegador. Clique em Create API token, dê o nome Muxor e copie o token.');
+    await tela.link('https://id.atlassian.com/manage-profile/security/api-tokens', 'API token do Jira', { abrir: true });
     const conectou = await tentar('Jira', async () => {
       ctx.definirEnv({
-        JIRA_URL: await tela.texto('Endereço do seu Jira', { exemplo: 'https://suaempresa.atlassian.net', validar: (v) => (/^https:\/\/[^/]+/.test(v) ? undefined : 'Ex.: https://suaempresa.atlassian.net') }),
-        JIRA_EMAIL: await tela.texto('E-mail da sua conta Atlassian'),
-        JIRA_API_TOKEN: await tela.segredo('API token do Jira (não aparece na tela)'),
+        JIRA_URL: enderecoJira(await tela.texto('Nome do seu Jira, o que vem antes de .atlassian.net', { validar: (v) => (enderecoJira(v) ? undefined : 'Só o nome, ex.: minhaempresa') })),
+        JIRA_EMAIL: await tela.texto('E-mail da conta Atlassian', { validar: (v) => (/^\S+@\S+$/.test(v) ? undefined : 'Digite o e-mail.') }),
+        JIRA_API_TOKEN: await tela.segredo('API token do Jira'),
       });
       return await new JiraAdapter(ctx.envParcial()).ping();
     });
@@ -134,6 +133,13 @@ export async function ferramentas(ctx: Ctx): Promise<Ferramenta[]> {
     else ctx.definirEnv({ JIRA_URL: null, JIRA_EMAIL: null, JIRA_API_TOKEN: null });
   }
   return ok;
+}
+
+// O endereço do Jira completo a partir do que a pessoa digitar: "minhaempresa", "minhaempresa.atlassian.net" ou a URL.
+export function enderecoJira(v: string) {
+  const t = v.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
+  if (!t || !/^[a-z0-9.-]+$/.test(t)) return '';
+  return `https://${t.includes('.') ? t : `${t}.atlassian.net`}`;
 }
 
 export function adaptadores(ctx: Ctx): PmAdapter[] {
@@ -150,14 +156,8 @@ export function adaptadores(ctx: Ctx): PmAdapter[] {
 export async function espacos(ctx: Ctx) {
   tela.nota(
     [
-      'Um espaço é uma pasta do seu Mac ligada a uma conta do GitHub. Ex.:',
-      '  • "Empresa"  → ~/Documents/EMPRESA   (conta do trabalho)',
-      '  • "Pessoal"  → ~/Documents/PESSOAL   (conta pessoal)',
-      'Tudo o que o Claude fizer dentro da pasta (commit, push, PR) sai pela conta daquele espaço.',
-      'As ferramentas de gestão não importam aqui: o projeto de cada uma é ligado a uma pasta mais adiante.',
-      '',
-      'Se hoje os seus repositórios estão misturados (de contas diferentes na mesma pasta), vale reorganizar:',
-      'mova cada repositório para a pasta do espaço da conta dele. Dá para fazer depois, com calma.',
+      'Um espaço é uma pasta ligada a uma conta do GitHub. Commit, push e PR feitos lá saem por essa conta.',
+      'Exemplo: Empresa em ~/Documents/EMPRESA com a conta do trabalho, Pessoal em ~/Documents/PESSOAL com a sua.',
     ].join('\n'),
     'Espaços',
   );
@@ -166,22 +166,21 @@ export async function espacos(ctx: Ctx) {
   // Retomando (ou voltando a este passo): os espaços já criados ficam, e eu só pergunto se quer outro.
   const jaTem = loadCatalogo().espacos;
   if (jaTem.length) {
-    tela.ok(`Espaços que você já criou:\n${jaTem.map((e) => `  • ${nomeEspaco(e)} → ${e.pasta}${e.github ? ` (conta ${e.github})` : ''}`).join('\n')}`);
-    if (!(await tela.sim('Criar mais um espaço (outra conta do GitHub)?', false))) return;
+    tela.ok(`Seus espaços:\n${jaTem.map((e) => `  ${nomeEspaco(e)}  ${e.pasta}${e.github ? `  conta ${e.github}` : ''}`).join('\n')}`);
+    if (!(await tela.sim('Criar mais um espaço?', false))) return;
   }
   do await novoEspaco(ctx, usaFunifier);
-  while (await tela.sim('Adicionar outro espaço (outra conta do GitHub)?', false));
+  while (await tela.sim('Criar outro espaço, com outra conta do GitHub?', false));
 }
 
 export async function novoEspaco(ctx: Ctx, usaFunifier: boolean) {
   const cat = loadCatalogo();
-  const nome = await tela.texto('Nome do espaço', {
-    exemplo: 'Empresa, Pessoal…',
+  const nome = await tela.texto('Nome do espaço, ex.: Empresa', {
     validar: (v) => (!slug(v) ? 'Use letras ou números.' : cat.espacos.some((e) => e.id === slug(v)) ? 'Já existe um espaço com esse nome.' : undefined),
   });
   const id = slug(nome);
   const pasta = expandir(
-    await tela.texto('Pasta do espaço (os projetos ficam dentro dela)', {
+    await tela.texto('Pasta do espaço, onde ficam os projetos', {
       padrao: join(homedir(), 'Documents', nome.toUpperCase().replace(/\s+/g, '-')),
       validar: (v) => (expandir(v).startsWith('/') ? undefined : 'Use um caminho completo, ex.: /Users/voce/Documents/EMPRESA'),
     }),
@@ -197,12 +196,11 @@ export async function novoEspaco(ctx: Ctx, usaFunifier: boolean) {
   const ghEnv = { ...process.env, GH_CONFIG_DIR: ghConfig };
   tela.nota(
     [
-      `Login do GitHub do espaço "${nome}":`,
-      '1. Vai aparecer um código de 8 letras: eu já copio para você. Aperte Enter e o navegador abre no GitHub.',
-      '2. Cole o código e autorize. Se o navegador estiver logado em OUTRA conta, troque de conta lá antes.',
-      '3. Se perguntar "Authenticate Git with your GitHub credentials?", responda N: o Muxor já faz isso só para esta pasta.',
+      '1. Aperte Enter. O navegador abre no GitHub e o código já está copiado.',
+      '2. Confira se o navegador está na conta deste espaço. Cole o código com Cmd+V e autorize.',
+      '3. Se o terminal perguntar "Authenticate Git with your GitHub credentials?", responda N.',
     ].join('\n'),
-    'GitHub',
+    `GitHub do espaço ${nome}`,
   );
   for (;;) {
     const antes = await credenciaisGlobais();
@@ -220,7 +218,7 @@ export async function novoEspaco(ctx: Ctx, usaFunifier: boolean) {
         if (m) {
           copiado = true;
           void rodar('sh', ['-c', 'printf %s "$1" | pbcopy', 'sh', m[1]]);
-          process.stderr.write(`\n  ✔ Código ${m[1]} copiado: no GitHub, é só colar (Cmd+V).\n\n`);
+          process.stderr.write(`\n  Código ${m[1]} copiado. No GitHub, cole com Cmd+V.\n\n`);
         }
       });
       filho.on('exit', (c) => ok(c ?? 1));
@@ -237,24 +235,23 @@ export async function novoEspaco(ctx: Ctx, usaFunifier: boolean) {
       .stdout.on('data', (d) => (saida += d));
   });
   tela.ok(`GitHub: conta ${u.login}.`);
-  const nomeGit = await tela.texto('Nome que vai nos commits deste espaço', { padrao: u.name ?? u.login });
+  const nomeGit = await tela.texto('Nome nos commits', { padrao: u.name ?? u.login });
   const sugestao = u.email ?? `${u.id}+${u.login}@users.noreply.github.com`;
-  tela.info(`E-mail dos commits: use o da conta ${u.login}. Sugestão: ${sugestao}${u.email ? '' : ' (o e-mail privado que o GitHub dá a cada conta)'}`);
-  const emailGit = await tela.texto('E-mail dos commits deste espaço (digite ou cole)', {
-    exemplo: sugestao,
-    validar: (v) => (/^\S+@\S+$/.test(v) ? undefined : 'Digite o e-mail (ex.: o sugerido acima).'),
+  tela.info(`E-mail da conta ${u.login}: ${sugestao}`);
+  const emailGit = await tela.texto('E-mail nos commits. Digite ou cole o de cima', {
+    validar: (v) => (/^\S+@\S+$/.test(v) ? undefined : 'Digite o e-mail.'),
   });
   const gh = (await rodar('which', ['gh'])).saida;
   const alt = await aplicarContaGit(gitconfigDoEspaco(ctx.casa, id), pasta, { nome: nomeGit, email: emailGit, gh, ghConfig });
   ctx.registrar({ tipo: 'gitconfig', ...alt });
-  tela.ok(`Dentro de ${pasta}, o git usa ${nomeGit} <${emailGit}> e a conta ${u.login}.`);
+  tela.ok(`Em ${pasta}, os commits saem como ${nomeGit} <${emailGit}>, pela conta ${u.login}.`);
 
   const gamificacao = usaFunifier ? await tela.sim('Os projetos deste espaço usam gamificações da Funifier?', false) : false;
   const regras = await tela.escolher(
-    'Regras de trabalho deste espaço (vão em todo prompt; dá para editar pelo /regras no Telegram)',
+    'Regras de trabalho do Claude neste espaço. Dá para editar depois pelo /regras',
     [
       { valor: 'modelo', rotulo: 'Usar o modelo', dica: 'branch nova, sem push na principal, commits sem menção a IA' },
-      { valor: 'nenhuma', rotulo: 'Nenhuma', dica: 'ex.: um espaço de testes, com projetos sem relação entre si' },
+      { valor: 'nenhuma', rotulo: 'Sem regras' },
     ],
     'modelo',
   );
@@ -264,7 +261,7 @@ export async function novoEspaco(ctx: Ctx, usaFunifier: boolean) {
     if (!existsSync(destino)) writeFileSync(destino, readFileSync(MODELO_REGRAS, 'utf8').replace(/^# .*$/m, `# Regras de trabalho — ${nome}`));
   }
   salvarEspaco({ id, nome, pasta, github: u.login, gh_config: ghConfig, ...(regras === 'nenhuma' ? { regras: 'nenhuma' } : {}), gamificacao });
-  tela.ok(`Espaço "${nome}" pronto.`);
+  tela.ok(`Espaço ${nome} pronto.`);
 }
 
 // O `gh auth login` pode oferecer configurar o git do usuário inteiro (credential helper global). O Muxor configura só a
@@ -288,7 +285,7 @@ async function desfazerCredenciaisNovas(antes: Record<string, string[]>) {
     // Tira tudo da chave e devolve o que existia antes, na mesma ordem.
     await rodar('git', ['config', '--global', '--unset-all', k]);
     for (const v of antes[k]) await rodar('git', ['config', '--global', '--add', k, v]);
-    tela.info('O gh tinha mudado o ~/.gitconfig global: desfiz (o Muxor configura só a pasta do espaço).');
+    tela.info('Desfiz a mudança que o gh fez no seu ~/.gitconfig. O Muxor configura só a pasta do espaço.');
   }
 }
 
@@ -301,40 +298,31 @@ export async function existentes(ctx: Ctx) {
   const noHub = new Set(cat.apps.map((a) => a.pasta));
   const doOrca = (await new Orca(ORCA_BIN).listRepos().catch(() => [])).filter((r) => r.path !== ctx.casa.sandbox);
   const jaNoMuxor = cat.apps.filter((a) => doOrca.some((r) => r.path === a.pasta));
-  if (jaNoMuxor.length) tela.ok(`Já no Muxor (${jaNoMuxor.length}):\n${jaNoMuxor.map((a) => `  • ${a.app} → ${a.pasta}`).join('\n')}`);
+  if (jaNoMuxor.length) tela.ok(`Já no Muxor:\n${jaNoMuxor.map((a) => `  ${a.app}  ${a.pasta}`).join('\n')}`);
   const repos = doOrca.filter((r) => !noHub.has(r.path));
   if (!repos.length) return tela.info(jaNoMuxor.length ? 'Todos os seus projetos do Orca já estão no Muxor.' : 'Nenhum projeto no Orca para trazer.');
-  tela.nota(
-    [
-      `Você tem ${repos.length} projeto(s) no Orca que ainda não estão no Muxor. Para cada um, você decide:`,
-      '  • Trazer para o Muxor: ele entra no fluxo completo. O Muxor manda tasks para ele, abre sessões do Claude e',
-      '    escreve nas sessões que já existem nessa pasta, e marca o status da área de trabalho no Orca.',
-      '  • Deixar de fora: o Muxor nunca toca nesse projeto nem nas sessões dele.',
-      'Dá para trazer mais depois: muxor adicionar projeto',
-    ].join('\n'),
-    'Projetos que você já tem no Orca',
-  );
+  tela.info('Marque os projetos do Orca que o Muxor pode usar. Os outros ele nunca toca. Dá para trazer mais depois com muxor adicionar projeto.');
   const espacoDaPasta = (p: string) => cat.espacos.find((e) => p.startsWith(e.pasta.replace(/\/+$/, '') + '/'));
   const escolhidos = await tela.varios(
-    'Quais trazer para o Muxor?',
+    'Quais projetos trazer? Marque com Espaço',
     repos.map((r) => ({
       valor: r.path,
       rotulo: r.displayName || basename(r.path),
-      dica: espacoDaPasta(r.path) ? `${r.path} · espaço ${nomeEspaco(espacoDaPasta(r.path)!)}` : `${r.path} · fora dos espaços`,
+      dica: r.path,
     })),
   );
   for (const pasta of escolhidos) {
     let e = espacoDaPasta(pasta);
     if (!e) {
-      tela.aviso(`${pasta} está fora das pastas dos espaços: o git ali continua com a configuração que você já usa (a conta do espaço vale só dentro da pasta dele).`);
-      const id = cat.espacos.length === 1 ? cat.espacos[0].id : await tela.escolher(`A que espaço ${basename(pasta)} pertence (para as regras de trabalho)?`, cat.espacos.map((x) => ({ valor: x.id, rotulo: nomeEspaco(x) })));
+      tela.aviso(`${basename(pasta)} fica fora das pastas dos espaços. Ali o git continua com a sua configuração de sempre.`);
+      const id = cat.espacos.length === 1 ? cat.espacos[0].id : await tela.escolher(`Quais regras de trabalho valem para ${basename(pasta)}?`, cat.espacos.map((x) => ({ valor: x.id, rotulo: `As do espaço ${nomeEspaco(x)}` })));
       e = cat.espacos.find((x) => x.id === id)!;
     }
     const atuais = loadCatalogo().apps;
     const base = slug(basename(pasta)) || 'projeto';
     const nome = atuais.some((a) => a.app === base) ? `${base}-${slug(e.id)}` : base;
     adicionarApp({ app: nome, espaco: e.id, ferramenta: 'nenhuma', pasta, projeto: null });
-    tela.ok(`${nome} entrou no Muxor (espaço ${nomeEspaco(e)}).`);
+    tela.ok(`${nome} entrou no Muxor.`);
   }
 }
 
@@ -342,27 +330,15 @@ export async function existentes(ctx: Ctx) {
 
 export async function repositorios(ctx: Ctx) {
   const cat = loadCatalogo();
-  // Primeiro o que já está pronto: os projetos que já estão no Muxor e as pastas que existem em cada espaço.
-  const noMuxor = new Set(cat.apps.map((a) => a.pasta));
+  // Primeiro o que já está nos espaços: quem já tem os projetos só segue.
   const resumo = cat.espacos.map((e) => {
     const pastas = subpastas(e.pasta);
-    const dentro = pastas.filter((n) => noMuxor.has(join(e.pasta, n)));
-    return `  • ${nomeEspaco(e)} (${e.pasta}): ${pastas.length} pasta(s)${dentro.length ? `, ${dentro.length} já no Muxor` : ''}${pastas.length ? `\n      ${pastas.slice(0, 8).join(', ')}${pastas.length > 8 ? '…' : ''}` : ''}`;
+    return `  ${nomeEspaco(e)}: ${pastas.length ? pastas.slice(0, 8).join(', ') + (pastas.length > 8 ? ` e mais ${pastas.length - 8}` : '') : 'nenhum projeto'}`;
   });
-  tela.nota(
-    [
-      'Este passo é só para BAIXAR repositórios que ainda não estão no seu Mac (git clone).',
-      'Os projetos que você já tem (os que trouxe do Orca no passo anterior e as pastas dentro dos espaços) não precisam',
-      'de nada aqui: no próximo passo você liga cada projeto da ferramenta de gestão a uma dessas pastas.',
-      '',
-      'O que já está nos seus espaços:',
-      ...(resumo.length ? resumo : ['  (nenhum espaço)']),
-    ].join('\n'),
-    'Repositórios',
-  );
-  const quer = await tela.escolher('Falta baixar algum repositório?', [
-    { valor: 'nao', rotulo: 'Não, já tenho os projetos de que preciso', dica: 'segue para o próximo passo' },
-    { valor: 'sim', rotulo: 'Sim, quero clonar repositórios agora', dica: 'o seu Claude Code clona nas pastas certas' },
+  tela.nota(['Projetos que já estão nos seus espaços:', ...resumo].join('\n'), 'Baixar repositórios');
+  const quer = await tela.escolher('Falta clonar algum repositório?', [
+    { valor: 'nao', rotulo: 'Não, já tenho os projetos' },
+    { valor: 'sim', rotulo: 'Sim, clonar agora com o Claude Code' },
   ]);
   if (quer === 'nao') return;
   await claudeComLogin();
@@ -376,18 +352,15 @@ export async function repositorios(ctx: Ctx) {
   await rodar('sh', ['-c', `printf %s "$1" | pbcopy`, 'sh', prompt]);
   tela.nota(
     [
-      'Quem clona é o seu Claude Code, cada repositório na pasta do espaço da conta dele:',
-      '1. Abra uma janela nova do Terminal (Cmd+N) e rode: claude',
-      '2. Cole (Cmd+V): o pedido já está copiado. Diga quais repositórios de cada conta você quer.',
-      '3. Quando ele terminar, volte para esta janela.',
-      '',
-      'Projeto sem repositório (ex.: uma pasta só para instalar um MCP) também vale: crio a pasta no próximo passo.',
+      '1. Abra outra janela do Terminal com Cmd+N e rode claude',
+      '2. Cole com Cmd+V. O pedido já está copiado: ele clona cada repositório no espaço da conta certa.',
+      '3. Diga quais repositórios quer e volte aqui quando ele terminar.',
     ].join('\n'),
     'Clonar com o Claude Code',
   );
   await tela.enter('Quando o Claude terminar de clonar, aperte Enter');
   const total = cat.espacos.reduce((n, e) => n + subpastas(e.pasta).length, 0);
-  tela.ok(`${total} pasta(s) de projeto nos espaços.`);
+  tela.ok(`${total} projetos nos espaços.`);
 }
 
 const subpastas = (p: string) => (existsSync(p) ? readdirSync(p).filter((n) => !n.startsWith('.') && statSync(join(p, n)).isDirectory()) : []);
@@ -396,7 +369,20 @@ const subpastas = (p: string) => (existsSync(p) ? readdirSync(p).filter((n) => !
 
 export async function dePara(ctx: Ctx) {
   const pms = adaptadores(ctx);
-  if (!pms.length) return tela.info('Sem ferramenta de gestão: nada para ligar.');
+  if (!pms.length) return tela.info('Sem ferramenta de gestão, não há projetos para ligar.');
+  tela.nota(
+    [
+      'Cada projeto da ferramenta de gestão roda numa pasta do seu Mac.',
+      'Não precisa ligar tudo agora: quando você mandar uma task de um projeto sem pasta, o Telegram pergunta',
+      'qual pasta usar. Assim você liga aos poucos, só os projetos que usar.',
+    ].join('\n'),
+    'Ligar projetos às pastas',
+  );
+  const agora = await tela.escolher('Como quer ligar?', [
+    { valor: 'telegram', rotulo: 'Pelo Telegram, quando chegar cada task', dica: 'recomendado' },
+    { valor: 'agora', rotulo: 'Agora, os projetos com tasks abertas' },
+  ]);
+  if (agora === 'telegram') return;
   try {
     await ligarProjetos(ctx, pms);
   } finally {
@@ -414,17 +400,10 @@ interface ProjetoDaFerramenta {
 }
 
 export async function ligarProjetos(ctx: Ctx, pms: PmAdapter[]) {
-  tela.nota(
-    [
-      'Cada projeto da ferramenta de gestão roda numa pasta do seu Mac (a do código dele).',
-      'Para cada um, escolha a pasta. Não sabe ainda? "Decidir depois": o Telegram pergunta quando chegar uma task.',
-    ].join('\n'),
-    'Ligar projetos às pastas',
-  );
   const projetos: ProjetoDaFerramenta[] = [];
   for (const pm of pms) {
     const nomeFer = NOME_FERRAMENTA[pm.nome] ?? pm.nome;
-    const tasks = await tela.esperando(`Buscando suas tasks no ${nomeFer}…`, () => pm.listMyTasks(), (t) => `${nomeFer}: ${t.length} task(s) abertas`);
+    const tasks = await tela.esperando(`Buscando suas tasks no ${nomeFer}`, () => pm.listMyTasks(), (t) => `${nomeFer}: ${t.length} ${t.length === 1 ? 'task aberta' : 'tasks abertas'}`);
     const porId = new Map<string, ProjetoDaFerramenta>();
     for (const t of tasks) {
       if (!t.projetoId) continue;
@@ -434,16 +413,16 @@ export async function ligarProjetos(ctx: Ctx, pms: PmAdapter[]) {
     }
     projetos.push(...porId.values());
   }
-  if (!projetos.length) return tela.info('Nenhuma task aberta nas suas ferramentas: você liga os projetos pelo Telegram quando chegar a primeira task.');
+  if (!projetos.length) return tela.info('Nenhuma task aberta agora. Você liga os projetos pelo Telegram, quando chegarem.');
 
   for (const p of projetos) await perguntarPasta(ctx, p);
   // Antes de seguir, o resumo: um Enter sem querer não passa do passo sem você ver como ficou.
   for (;;) {
     const cat = loadCatalogo();
     const destino = (p: ProjetoDaFerramenta) => appsDoProjeto(cat, p.ferramenta, p.projetoId)[0];
-    tela.nota(projetos.map((p) => `${p.nomeFer} · ${p.nome}  →  ${destino(p) ? `${destino(p).app} (${destino(p).pasta})` : 'decidir depois'}`).join('\n'), 'Como ficou');
+    tela.nota(projetos.map((p) => `${p.nomeFer} · ${p.nome}  →  ${destino(p) ? destino(p).app : 'pelo Telegram'}`).join('\n'), 'Como ficou');
     const escolha = await tela.escolher('Está certo?', [
-      { valor: 'ok', rotulo: 'Sim, seguir para o próximo passo' },
+      { valor: 'ok', rotulo: 'Sim, seguir' },
       ...projetos.map((p, i) => ({ valor: String(i), rotulo: `Mudar: ${p.nomeFer} · ${p.nome}` })),
     ]);
     if (escolha === 'ok') return;
@@ -458,17 +437,17 @@ async function perguntarPasta(ctx: Ctx, p: ProjetoDaFerramenta) {
   const opcoes = [
     ...cat.apps
       .filter((a) => a === atual || a.ferramenta === p.ferramenta || a.ferramenta === 'nenhuma')
-      .map((a) => ({ valor: `app|${a.app}`, rotulo: a === atual ? `${a.app} (ligado agora)` : a.app, dica: a.pasta })),
+      .map((a) => ({ valor: `app|${a.app}`, rotulo: a.app, dica: a === atual ? 'ligado agora' : a.pasta })),
     ...cat.espacos.flatMap((e) =>
       subpastas(e.pasta)
         .filter((n) => !pastasHub.has(join(e.pasta, n)))
         .map((n) => ({ valor: `${e.id}|${n}`, rotulo: `${nomeEspaco(e)} / ${n}`, dica: 'pasta nova no Muxor' })),
     ),
-    { valor: 'nova', rotulo: 'Criar uma pasta nova (sem repositório)' },
-    { valor: 'depois', rotulo: 'Decidir depois (pelo Telegram)' },
+    { valor: 'nova', rotulo: 'Criar uma pasta nova, sem repositório' },
+    { valor: 'depois', rotulo: 'Decidir pelo Telegram' },
   ];
   const escolha = await tela.escolher(
-    `${p.nomeFer} · "${p.nome}" (${p.n} task${p.n > 1 ? 's' : ''}, ex.: ${p.exemplo.slice(0, 40)}): qual pasta?`,
+    `Pasta de ${p.nomeFer} · ${p.nome}`,
     opcoes,
     atual ? `app|${atual.app}` : 'depois', // o cursor começa no que já vale (ou em "depois"): Enter sem querer não liga nada errado
   );
@@ -509,36 +488,39 @@ export async function telegram(ctx: Ctx) {
   await pararServico(); // com o Muxor rodando, o Telegram não deixa outro programa ler as mensagens do bot
   tela.nota(
     [
-      'O Muxor fala com você por um bot do Telegram só seu. Para criar:',
-      '1. Abra o BotFather (link e QR abaixo) e mande /newbot',
-      '2. Escolha um nome (ex.: Meu Hub) e um usuário terminado em "bot" (ex.: meuhub_tasks_bot)',
-      '3. Ele responde com um token (123456789:ABC…). Copie o token inteiro.',
+      'O Muxor fala com você por um bot do Telegram só seu. Faça pelo celular:',
+      '1. Leia o QR code abaixo com a câmera. Ele abre o BotFather no Telegram.',
+      '2. Mande /newbot',
+      '3. O BotFather pede dois nomes, um de cada vez:',
+      '   primeiro, o nome que aparece nos contatos, ex.: Meu Muxor',
+      '   depois, o usuário do bot, terminado em bot, ex.: meu_muxor_bot',
+      '4. Ele responde com o token, uma linha como 123456789:AAH4kX. Copie e cole aqui.',
     ].join('\n'),
-    'Telegram',
+    'Bot do Telegram',
   );
-  await tela.link('https://t.me/BotFather', 'BotFather (abra no celular pelo QR, ou clique no link)', { qr: true });
+  await tela.link('https://t.me/BotFather', 'BotFather', { qr: true });
   let bot: { usuario: string } | null = null;
   let token = '';
   while (!bot) {
-    token = await tela.segredo('Cole o token do bot (não aparece na tela)', (v) => (/^\d{6,}:[\w-]{30,}$/.test(v) ? undefined : 'O token tem o formato 123456789:ABC…'));
+    token = await tela.segredo('Token do bot', (v) => (/^\d{6,}:[\w-]{30,}$/.test(v) ? undefined : 'Copie a linha inteira do token, com os números, os dois-pontos e as letras.'));
     try {
-      bot = await tela.esperando('Conferindo o bot…', () => conferirBot(token), (b) => `Bot @${b.usuario} conferido`);
+      bot = await tela.esperando('Conferindo o bot', () => conferirBot(token), (b) => `Bot @${b.usuario} conferido`);
     } catch (e) {
       tela.erro((e as Error).message);
     }
   }
   ctx.definirEnv({ TELEGRAM_BOT_TOKEN: token });
-  await tela.link(`https://t.me/${bot.usuario}`, `Abra o @${bot.usuario} e toque em Iniciar (ou mande /start)`, { qr: true, abrir: true });
+  await tela.link(`https://t.me/${bot.usuario}`, `Leia com o celular, abra o @${bot.usuario} e toque em Iniciar`, { qr: true });
   for (;;) {
-    const dono = await tela.esperando('Esperando o seu /start no bot…', () => esperarDono(token), (d) => `Mensagem recebida de ${d.nome}`);
-    if (await tela.sim(`É você (${dono.nome})? Só esta conversa vai poder usar o hub.`)) {
+    const dono = await tela.esperando('Esperando você tocar em Iniciar no bot', () => esperarDono(token), (d) => `Chegou a mensagem de ${d.nome}`);
+    if (await tela.sim(`${dono.nome} é você? Só esta conta vai usar o Muxor.`)) {
       ctx.definirEnv({ TELEGRAM_CHAT_ID: String(dono.chatId) });
-      await mandar(token, dono.chatId, '✅ Muxor conectado. Volte ao terminal para terminar a configuração.');
+      await mandar(token, dono.chatId, 'Muxor conectado. Volte ao terminal para terminar a configuração.');
       ctx.registrar({ tipo: 'telegram-bot', usuario: bot.usuario });
-      tela.ok('Telegram pronto: chegou uma mensagem de confirmação no bot.');
+      tela.ok('Telegram pronto. Mandei uma mensagem de confirmação no bot.');
       return;
     }
-    tela.info('Então mande /start pela conta certa.');
+    tela.info('Então toque em Iniciar pela sua conta.');
   }
 }
 
@@ -553,28 +535,23 @@ const aparelhosMoveis = () => {
 };
 
 export async function orca() {
-  tela.nota(
-    [
-      'O Muxor abre as sessões do Claude com --permission-mode auto (o Claude pede aprovação só para o arriscado).',
-      'Recomendado também para as sessões que você abrir à mão no Orca:',
-      '  Orca → Settings → Agents → Claude → Launch arguments: --permission-mode auto',
-    ].join('\n'),
-    'Orca',
-  );
-  if (!(await tela.sim('Quer acompanhar e responder as sessões pelo celular, de qualquer rede?'))) return;
+  if (!(await tela.sim('Quer acompanhar e responder as sessões pelo celular, em qualquer rede?'))) return;
   const antes = aparelhosMoveis();
   tela.nota(
     [
-      '1. Instale o app do Orca no celular (App Store ou Google Play: "Orca").',
-      '2. No Orca do Mac, abra a opção de conectar um celular e escolha Relay: funciona em qualquer rede (4G, outra Wi-Fi).',
-      '   A outra opção (LAN) só funciona com o celular na mesma Wi-Fi do Mac.',
-      '3. No app do celular, leia o QR code que o Orca do Mac mostrar.',
+      '1. No celular, instale o app Orca pela App Store ou pelo Google Play.',
+      '2. No Orca do Mac, abra Settings e clique em Mobile.',
+      `3. Em "How the phone reaches this computer", escolha ${destaque('Orca Relay')}.`,
+      `   ${destaque('Não use LAN')}: ela só funciona com o celular na mesma Wi-Fi do Mac.`,
+      '4. Clique em Sign in for Relay e entre com a sua conta.',
+      '5. Clique em Generate code. Aparece um QR code.',
+      '6. No celular, abra o Orca, toque em Pair Desktop e leia o QR code.',
     ].join('\n'),
-    'Celular',
+    'Orca no celular',
   );
-  await tela.enter('Quando o celular aparecer conectado no Orca, aperte Enter');
+  await tela.enter('Aperte Enter quando o celular aparecer pareado no Orca');
   if (aparelhosMoveis() > antes) tela.ok('Celular pareado com o Orca.');
-  else tela.aviso('Não vi um celular novo no Orca. Dá para parear depois, pelo mesmo caminho; o resto do Muxor não depende disso.');
+  else tela.aviso('Não vi um celular novo no Orca. Dá para parear depois, pelo mesmo caminho. O resto funciona sem isso.');
 }
 
 // ───────────────────────── 10. Serviço ─────────────────────────
@@ -591,7 +568,7 @@ export async function servico(ctx: Ctx) {
   mkdirSync(ctx.casa.logs, { recursive: true });
   const caminho = [dirname(process.execPath), join(homedir(), '.local', 'bin'), '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
   const plist = await tela.esperando(
-    'Instalando o Muxor como serviço do Mac…',
+    'Instalando o Muxor como serviço do Mac',
     () =>
       instalarServico(
         conteudoPlist({
@@ -601,15 +578,15 @@ export async function servico(ctx: Ctx) {
           ambiente: { HUB_DADOS_DIR: ctx.casa.dados, DOTENV_CONFIG_PATH: ctx.casa.env, PATH: [...new Set(caminho)].join(':'), HOME: homedir(), LANG: 'pt_BR.UTF-8' },
         }),
       ),
-    () => 'Serviço instalado: o Muxor sobe sozinho quando você entra no Mac',
+    () => 'Serviço instalado. O Muxor liga sozinho quando você entra no Mac',
   );
   ctx.registrar({ tipo: 'launchagent', plist, rotulo: ROTULO });
   ctx.registrar({ tipo: 'keychain', servico: process.env.HUB_KEYCHAIN_SERVICO ?? 'hub-tasks' });
-  const subiu = await tela.esperando('Esperando o Muxor ficar online…', () => esperarOnline(ctx), (ok) => (ok ? 'Muxor online (chegou o aviso no Telegram)' : 'O Muxor não ficou online'));
+  const subiu = await tela.esperando('Ligando o Muxor', () => esperarOnline(ctx), (ok) => (ok ? 'Muxor ligado. Chegou o aviso no Telegram' : 'O Muxor não ligou'));
   if (!subiu) {
-    const fim = existsSync(log) ? readFileSync(log, 'utf8').split('\n').slice(-12).join('\n') : '(sem log)';
+    const fim = existsSync(log) ? readFileSync(log, 'utf8').split('\n').slice(-12).join('\n') : 'Sem registro';
     tela.nota(fim, `Últimas linhas de ${log}`);
-    tela.info('Rode `muxor diagnostico` para ver o que falta. Depois, `muxor init` continua daqui.');
+    tela.info('Rode muxor diagnostico para ver o que falta. Depois, muxor init continua daqui.');
     throw new Interrompido();
   }
 }
@@ -634,7 +611,7 @@ async function esperarOnline(ctx: Ctx, limiteMs = 90_000) {
 // ───────────────────────── 11. Teste de ponta a ponta ─────────────────────────
 
 export async function teste() {
-  tela.info('Último passo: uma task de teste no sandbox, de ponta a ponta. O Claude abre no Orca, responde e o Muxor avisa no Telegram.');
+  tela.info('Último passo: uma task de teste numa pasta de teste. O Claude abre no Orca, responde, e o Muxor avisa no Telegram.');
   const { openDb } = await import('../../db.js');
   const db = openDb();
   const agora = new Date().toISOString();
@@ -653,9 +630,9 @@ export async function teste() {
     db.prepare("INSERT INTO fila (app, selecao_id, criado_em) VALUES ('sandbox', ?, ?)").run(sel, agora);
     return sel;
   })();
-  tela.info('Na primeira vez numa pasta, o Claude pergunta se confia nela: o Muxor avisa no Telegram, e você responde "Yes" no Orca.');
+  tela.info(`Na primeira vez numa pasta, o Claude pergunta se confia nela. Abra a sessão no Orca, no Mac ou no celular, e escolha ${destaque('Yes')}.`);
   const estado = await tela.esperando(
-    'Rodando a task de teste (até 5 min)…',
+    'Rodando a task de teste, leva até 5 minutos',
     async () => {
       const fim = Date.now() + 5 * 60_000;
       let e = '';
@@ -666,31 +643,29 @@ export async function teste() {
       }
       return e;
     },
-    (e) => (e === 'concluido' ? 'Task de teste concluída' : `Task de teste: ${e || 'não começou'}`),
+    (e) => (e === 'concluido' ? 'Task de teste concluída' : `A task de teste ficou em: ${e || 'não começou'}`),
   );
   db.close();
   if (estado !== 'concluido') {
-    tela.aviso('A task de teste não terminou. Veja o que o Muxor disse no Telegram e rode `muxor diagnostico`. Rodar `muxor init` de novo refaz este teste.');
+    tela.aviso('A task de teste não terminou. Veja a mensagem no Telegram e rode muxor diagnostico. Depois, muxor init refaz o teste.');
     throw new Interrompido();
   }
 }
 
 export function resumoFinal(ferramentasOk: string[]) {
   const linhas = [
-    'Pelo Telegram (no bot que você criou):',
-    '  /tarefas    suas tasks para escolher e mandar ao Claude',
-    '  /nova       atividade avulsa, sem ferramenta de gestão',
-    '  /menu       os outros comandos',
-    ...(ferramentasOk.includes('funifier-pm') ? ['  /gamificacoes  cadastre as credenciais das gamificações da Funifier'] : []),
+    'No Telegram:',
+    '  /tarefas       suas tasks, para mandar ao Claude',
+    '  /nova          uma atividade avulsa',
+    '  /menu          os outros comandos',
+    ...(ferramentasOk.includes('funifier-pm') ? ['  /gamificacoes  as credenciais das gamificações'] : []),
     '',
     'No terminal:',
-    '  muxor diagnostico              confere tudo e diz o próximo passo',
-    '  muxor adicionar github-workspace   outro espaço (outra conta do GitHub)',
-    '  muxor adicionar projeto        traz mais projetos (do Orca ou das pastas) para o Muxor',
-    '  muxor adicionar heartbeat      aviso se o Muxor cair (opcional)',
-    '  muxor desinstalar              desfaz tudo o que o muxor init fez',
-    '',
-    'Na primeira task de cada projeto o Claude pergunta se confia na pasta: responda "Yes" no Orca.',
+    '  muxor diagnostico                  confere tudo',
+    '  muxor adicionar github-workspace   outro espaço',
+    '  muxor adicionar projeto            mais projetos',
+    '  muxor update                       a versão nova do Muxor',
+    '  muxor desinstalar                  desfaz a instalação',
   ];
   tela.nota(linhas.join('\n'), 'Pronto');
 }

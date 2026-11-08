@@ -106,14 +106,14 @@ export class Sessoes {
       estado === 'aguardando'
         ? cartao({
             icone: ICONE.voce,
-            titulo: `Sessão nova em ${esc(app.app)} pede algo`,
-            contexto: [esc(curto(titulo, 60)), 'na fila'],
-            rodape: 'Responda no Orca (ex.: confiar na pasta); depois a task segue.',
+            titulo: `${esc(app.app)}: o Claude precisa de você`,
+            contexto: [esc(curto(titulo, 60))],
+            rodape: `Abra a sessão hub #${sel.id} no Orca e responda. Na primeira vez numa pasta ele pergunta se confia nela: escolha Yes. Depois a task segue sozinha.`,
           })
         : cartao({
             icone: ICONE.aviso,
-            titulo: `Sessão nova em ${esc(app.app)} não ficou pronta`,
-            contexto: [esc(curto(titulo, 60)), 'na fila'],
+            titulo: `${esc(app.app)}: a sessão do Claude não abriu`,
+            contexto: [esc(curto(titulo, 60))],
             rodape: 'Tento de novo em instantes.',
           }),
     );

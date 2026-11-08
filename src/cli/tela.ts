@@ -9,6 +9,8 @@ import { abertura } from './arte.js';
 // Cores do terminal sem biblioteca (os códigos ANSI de sempre).
 const ansi = (abre: number, fecha: number) => (t: string) => `\x1b[${abre}m${t}\x1b[${fecha}m`;
 const pc = { bold: ansi(1, 22), dim: ansi(2, 22), yellow: ansi(33, 39), green: ansi(32, 39), cyan: ansi(36, 39) };
+// Para o que a pessoa não pode errar (ex.: escolher Orca Relay): negrito amarelo.
+export const destaque = (t: string) => pc.bold(pc.yellow(t));
 
 // Textos da biblioteca em português (as instruções são listas exportadas por ela). As teclas que importam vêm em
 // destaque: Espaço marca (amarelo), Enter confirma (verde), Esc volta (ciano).
@@ -50,7 +52,7 @@ export const tela = {
   // Liga a opção "← Voltar" nas listas de escolha (o muxor init liga; os outros comandos não têm passos).
   botaoVoltar: false,
   passo(n: number, total: number, titulo: string, podeVoltar = false) {
-    p.log.step(`Passo ${n} de ${total} · ${titulo}${podeVoltar ? `  ${pc.dim('(')}${pc.cyan('Esc')}${pc.dim(' ou ← Voltar: passo anterior)')}` : ''}`);
+    p.log.step(`Passo ${n} de ${total} · ${titulo}${podeVoltar ? pc.dim(`   ${pc.cyan('Esc')} volta ao passo anterior`) : ''}`);
   },
   info: (t: string) => p.log.info(t),
   ok: (t: string) => p.log.success(t),
@@ -73,7 +75,7 @@ export const tela = {
     return valor(await p.password({ message: pergunta, validate: (v) => (validar ? validar((v ?? '').trim()) : (v ?? '').trim() ? undefined : 'Cole o valor.') })).trim();
   },
   async sim(pergunta: string, padrao = true) {
-    return valor(await p.confirm({ message: pergunta, initialValue: padrao }));
+    return valor(await p.confirm({ message: pergunta, initialValue: padrao, active: 'Sim', inactive: 'Não' }));
   },
   async escolher<T extends string>(pergunta: string, opcoes: { valor: T; rotulo: string; dica?: string }[], padrao?: T, o: { semVoltar?: boolean } = {}) {
     const comVoltar = tela.botaoVoltar && !o.semVoltar;
@@ -100,7 +102,7 @@ export const tela = {
   },
 
   async esperando<T>(texto: string, fn: () => Promise<T>, fim = (_: T) => texto.replace(/…$/, '')) {
-    const s = p.spinner();
+    const s = p.spinner({ indicator: 'timer' }); // o tempo passando, em vez de reticências
     s.start(texto);
     try {
       const r = await fn();

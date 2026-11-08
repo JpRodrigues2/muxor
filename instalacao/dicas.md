@@ -35,7 +35,7 @@ Cadastre pelo Telegram: o comando aparece no `/menu` quando o Funifier PM está 
 apagada na hora e a credencial vai para o Keychain.
 
 **O celular não conecta ao Orca fora de casa.**
-Pareie de novo escolhendo **Relay** (qualquer rede) em vez de LAN (só a mesma Wi-Fi).
+Pareie de novo: no Orca do Mac, Settings › Mobile, escolha **Orca Relay** (funciona em qualquer rede) em vez de LAN (só a mesma Wi-Fi), clique em Sign in for Relay e em Generate code.
 
 **Quero ver o que o Muxor está fazendo.**
 Os logs ficam em `~/.muxor/dados/logs/` (`hub-<data>.log` e `servico.log`).
